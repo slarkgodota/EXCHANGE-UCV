@@ -45,7 +45,7 @@ En Windows también puedes hacer doble clic en `iniciar_en_windows.bat` (en Mac/
 | José Roly Gonzalez Guevara (dueño) | `jgonzalezg@ucvvirtual.edu.pe` | `AdminExchange2026*` |
 | Michael Cristofer Grandez Acosta (dueño) | `mgrandeza@ucvvirtual.edu.pe` | `AdminExchange2026*` |
 
-Desde el botón **Admin** se ve el registro completo de usuarios, se asignan roles (Estudiante, Profesor / Docente, Administrador, etc.), se crean roles nuevos, se moderan publicaciones y se atienden reportes.
+Desde el botón **Admin** se ve el registro completo de usuarios, el **historial de actividad** (registros, inicios de sesión, publicaciones, solicitudes, reportes, cambios de rol), se descargan ambos en Excel (CSV), se asignan roles (Estudiante, Profesor / Docente, Administrador, etc.), se crean roles nuevos, se moderan publicaciones y se atienden reportes.
 
 ## Limitación importante (siguiente paso)
 

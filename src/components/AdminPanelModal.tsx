@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Shield, Users, FileText, Flag, KeyRound, Search, UserPlus, Trash2, Lock, Check, Star, Eye, EyeOff, BadgeCheck, RotateCcw, Plus } from 'lucide-react';
+import { X, Shield, Users, FileText, Flag, KeyRound, Search, UserPlus, Trash2, Lock, Check, Star, Eye, EyeOff, BadgeCheck, RotateCcw, Plus, History, Download } from 'lucide-react';
+import { downloadBlob } from '../utils/fileStore';
+import { ActivityType } from '../context/ExchangeContext';
 import { useExchange, CREATOR_EMAILS } from '../context/ExchangeContext';
 import { calculateAdminMetrics, validateAdminCreateUser } from '../utils/exchangeLogic';
 import { CareerType, CampusType, RolePermission } from '../types/exchange';
@@ -7,7 +9,45 @@ import { CAREERS, UCV_CAMPUSES, getCampusLabel } from '../data/ucv';
 import { Avatar } from './Avatar';
 import { StarDisplay } from './StarRating';
 
-type Tab = 'resumen' | 'usuarios' | 'publicaciones' | 'reportes' | 'roles';
+type Tab = 'resumen' | 'usuarios' | 'historial' | 'publicaciones' | 'reportes' | 'roles';
+
+const ACTIVITY_LABELS: Record<ActivityType, string> = {
+  registro: 'Registro',
+  inicio_sesion: 'Inicio de sesión',
+  cierre_sesion: 'Cierre de sesión',
+  publicacion: 'Publicación',
+  publicacion_eliminada: 'Publicación eliminada',
+  resena: 'Reseña',
+  solicitud: 'Solicitud',
+  solicitud_respondida: 'Respuesta a solicitud',
+  reporte: 'Reporte',
+  cambio_rol: 'Cambio de rol',
+  cuenta_creada_admin: 'Cuenta creada por admin',
+  cuenta_eliminada: 'Cuenta eliminada',
+  moderacion: 'Moderación',
+};
+
+const ACTIVITY_TONE: Partial<Record<ActivityType, string>> = {
+  registro: 'bg-emerald-100 text-emerald-800',
+  publicacion: 'bg-blue-100 text-blue-800',
+  reporte: 'bg-red-100 text-red-700',
+  cuenta_eliminada: 'bg-red-100 text-red-700',
+  publicacion_eliminada: 'bg-red-100 text-red-700',
+  cambio_rol: 'bg-violet-100 text-violet-800',
+  solicitud: 'bg-amber-100 text-amber-800',
+};
+
+const fmtDate = (iso: string) => {
+  try {
+    return new Date(iso).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
+  } catch {
+    return iso;
+  }
+};
+
+/** CSV con separador ; y BOM para que Excel en español lo abra bien. */
+const toCSV = (rows: (string | number)[][]) =>
+  '\uFEFF' + rows.map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
 
 const PERMISSION_LABELS: Record<keyof RolePermission, string> = {
   canPublish: 'Publicar',
@@ -76,6 +116,7 @@ export const AdminPanelModal: React.FC = () => {
     deleteRole,
     resetDatabase,
     currentUser,
+    activity,
   } = useExchange();
 
   const [tab, setTab] = useState<Tab>('resumen');
@@ -86,6 +127,8 @@ export const AdminPanelModal: React.FC = () => {
   };
 
   const [q, setQ] = useState('');
+  const [actType, setActType] = useState<'todos' | ActivityType>('todos');
+  const [actQ, setActQ] = useState('');
   const [roleFilter, setRoleFilter] = useState('todos');
   const [showNew, setShowNew] = useState(false);
   const [nu, setNu] = useState({ name: '', email: '', password: '', role: 'student', career: 'Ingeniería Civil' as CareerType, campus: 'Moyobamba' as CampusType });
@@ -120,6 +163,30 @@ export const AdminPanelModal: React.FC = () => {
   }, [users, q, roleFilter]);
 
   if (!isAdminModalOpen || !isCreatorOrAdmin) return null;
+
+  const filteredActivity = activity.filter(
+    (a) =>
+      (actType === 'todos' || a.type === actType) &&
+      (!actQ.trim() || [a.actorName, a.actorEmail, a.detail].join(' ').toLowerCase().includes(actQ.trim().toLowerCase()))
+  );
+
+  const exportCSV = async (name: string, rows: (string | number)[][]) => {
+    const res = await downloadBlob(new Blob([toCSV(rows)], { type: 'text/csv;charset=utf-8' }), name);
+    if (res === 'saved') flash(`Descargado ${name}`);
+    else if (res === 'error') flash('No se pudo descargar el archivo.');
+  };
+
+  const exportUsers = () =>
+    exportCSV(`usuarios-exchange-ucv-${new Date().toISOString().slice(0, 10)}.csv`, [
+      ['Nombre', 'Correo', 'Celular', 'Rol', 'Carrera', 'Sede', 'Ciclo', 'Verificado', 'Fecha de registro'],
+      ...users.map((u) => [u.name, u.email, u.phone || '', getRoleById(u.role).name, u.career, getCampusLabel(u.campus), u.cycle, u.verified ? 'Sí' : 'No', u.createdAt || 'Cuenta inicial']),
+    ]);
+
+  const exportActivity = () =>
+    exportCSV(`historial-exchange-ucv-${new Date().toISOString().slice(0, 10)}.csv`, [
+      ['Fecha y hora', 'Tipo', 'Usuario', 'Correo', 'Detalle'],
+      ...filteredActivity.map((a) => [fmtDate(a.at), ACTIVITY_LABELS[a.type], a.actorName, a.actorEmail, a.detail]),
+    ]);
 
   const isProtected = (email: string) => CREATOR_EMAILS.includes(email.toLowerCase().trim());
   const pendingReports = reports.filter((r) => r.status === 'pendiente').length;
@@ -158,6 +225,7 @@ export const AdminPanelModal: React.FC = () => {
   const TABS: { id: Tab; label: string; icon: typeof Users; count?: number }[] = [
     { id: 'resumen', label: 'Resumen', icon: Shield },
     { id: 'usuarios', label: 'Usuarios', icon: Users, count: users.length },
+    { id: 'historial', label: 'Historial', icon: History, count: activity.length },
     { id: 'publicaciones', label: 'Publicaciones', icon: FileText, count: publications.length },
     { id: 'reportes', label: 'Reportes', icon: Flag, count: pendingReports },
     { id: 'roles', label: 'Roles', icon: KeyRound, count: roles.length },
@@ -281,6 +349,9 @@ export const AdminPanelModal: React.FC = () => {
                     <option key={r.id} value={r.id}>{r.name}</option>
                   ))}
                 </select>
+                <button type="button" onClick={exportUsers} className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold">
+                  <Download className="w-4 h-4" /> Excel (CSV)
+                </button>
                 <button type="button" onClick={() => setShowNew(!showNew)} className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold">
                   <UserPlus className="w-4 h-4" /> Nueva cuenta
                 </button>
@@ -398,6 +469,61 @@ export const AdminPanelModal: React.FC = () => {
                 </table>
                 {filteredUsers.length === 0 && <p className="p-8 text-center text-sm text-slate-500">Sin usuarios con ese filtro.</p>}
               </div>
+            </div>
+          )}
+
+          {tab === 'historial' && (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <label className="relative flex-1">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                  <input id="act-q" value={actQ} onChange={(e) => setActQ(e.target.value)} placeholder="Buscar por usuario, correo o detalle" className={`${inputCls} pl-10`} />
+                </label>
+                <select id="act-type" aria-label="Tipo de actividad" value={actType} onChange={(e) => setActType(e.target.value as any)} className={`${inputCls} sm:w-56`}>
+                  <option value="todos">Toda la actividad</option>
+                  {(Object.keys(ACTIVITY_LABELS) as ActivityType[]).map((t) => (
+                    <option key={t} value={t}>{ACTIVITY_LABELS[t]}</option>
+                  ))}
+                </select>
+                <button type="button" onClick={exportActivity} className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold">
+                  <Download className="w-4 h-4" /> Excel (CSV)
+                </button>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-x-auto">
+                {filteredActivity.length === 0 ? (
+                  <p className="p-10 text-center text-sm text-slate-500">
+                    {activity.length === 0 ? 'Aún no hay actividad. Aquí aparecerán los registros, inicios de sesión, publicaciones y más.' : 'Sin resultados con ese filtro.'}
+                  </p>
+                ) : (
+                  <table className="w-full text-sm min-w-[720px]">
+                    <thead className="bg-slate-50 text-left text-xs text-slate-500 uppercase tracking-wide">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold">Fecha y hora</th>
+                        <th className="px-4 py-3 font-semibold">Tipo</th>
+                        <th className="px-4 py-3 font-semibold">Usuario</th>
+                        <th className="px-4 py-3 font-semibold">Detalle</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredActivity.slice(0, 300).map((a) => (
+                        <tr key={a.id} className="hover:bg-slate-50/70 align-top">
+                          <td className="px-4 py-3 text-xs text-slate-500 tabular-nums whitespace-nowrap">{fmtDate(a.at)}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${ACTIVITY_TONE[a.type] || 'bg-slate-100 text-slate-700'}`}>{ACTIVITY_LABELS[a.type]}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-slate-900">{a.actorName}</p>
+                            <p className="text-xs text-slate-500">{a.actorEmail}</p>
+                          </td>
+                          <td className="px-4 py-3 text-slate-700">{a.detail}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+              {filteredActivity.length > 300 && <p className="text-xs text-slate-500">Mostrando los 300 más recientes de {filteredActivity.length}. Descarga el CSV para verlos todos.</p>}
             </div>
           )}
 

@@ -158,6 +158,7 @@ interface ExchangeContextType {
   deleteUser: (userId: string) => boolean;
   resetDatabase: () => void;
   libraryRatings: LibraryRatings;
+  activity: ActivityEntry[];
   rateLibraryResource: (resourceId: string, stars: number) => ActionResult;
 }
 
@@ -173,7 +174,34 @@ const STORAGE_KEYS = {
   REQUESTS: 'exchange_ucv_requests_v5',
   REPORTS: 'exchange_ucv_reports_v5',
   LIBRARY_RATINGS: 'exchange_ucv_library_ratings_v5',
+  ACTIVITY: 'exchange_ucv_activity_v5',
 };
+
+export type ActivityType =
+  | 'registro'
+  | 'inicio_sesion'
+  | 'cierre_sesion'
+  | 'publicacion'
+  | 'publicacion_eliminada'
+  | 'resena'
+  | 'solicitud'
+  | 'solicitud_respondida'
+  | 'reporte'
+  | 'cambio_rol'
+  | 'cuenta_creada_admin'
+  | 'cuenta_eliminada'
+  | 'moderacion';
+
+export interface ActivityEntry {
+  id: string;
+  at: string; // ISO
+  type: ActivityType;
+  actorName: string;
+  actorEmail: string;
+  detail: string;
+}
+
+const MAX_ACTIVITY = 2000;
 
 /** recurso de biblioteca → { usuario → estrellas (1-5) } */
 export type LibraryRatings = Record<string, Record<string, number>>;
@@ -273,6 +301,19 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   );
   useEffect(() => saveJSON(STORAGE_KEYS.LIBRARY_RATINGS, libraryRatings), [libraryRatings]);
 
+  const [activity, setActivity] = useState<ActivityEntry[]>(() => loadJSON(STORAGE_KEYS.ACTIVITY, []));
+  useEffect(() => saveJSON(STORAGE_KEYS.ACTIVITY, activity), [activity]);
+  /** Registra un evento en el historial del panel de administración. */
+  const log = (type: ActivityType, detail: string, actor?: { name: string; email: string } | null) => {
+    const who = actor === undefined ? currentUserRef.current : actor;
+    setActivity((prev) =>
+      [
+        { id: newId('act'), at: new Date().toISOString(), type, actorName: who?.name || 'Invitado', actorEmail: who?.email || '', detail },
+        ...prev,
+      ].slice(0, MAX_ACTIVITY)
+    );
+  };
+
   const [filter, setFilter] = useState<FilterState>(DEFAULT_FILTER);
   const [selectedPublication, setSelectedPublicationState] = useState<Publication | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -283,6 +324,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [authMode, setAuthMode] = useState<AuthMode>('login');
 
   const currentUser = users.find((u) => u.id === currentUserId) || null;
+  const currentUserRef = { current: currentUser };
   const isLoggedIn = Boolean(currentUser);
 
   // Al entrar a la página sin sesión se muestra el acceso (iniciar sesión o registrarse)
@@ -381,6 +423,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return { ok: false, error: 'Correo o contraseña incorrectos.' };
     }
     setCurrentUserId(found.id);
+    log('inicio_sesion', 'Inició sesión', found);
     setIsAuthModalOpen(false);
     celebrate({ particleCount: 40 });
     return { ok: true };
@@ -417,6 +460,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     setUsers((prev) => [...prev, newUser]);
+    log('registro', `Nueva cuenta · ${newUser.career} · ${newUser.campus}${newUser.phone ? ' · ' + newUser.phone : ''}`, newUser);
     setCurrentUserId(newUser.id);
     setIsAuthModalOpen(false);
     celebrate({ particleCount: 80, origin: { y: 0.6 } });
@@ -424,6 +468,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const logoutUser = () => {
+    if (currentUser) log('cierre_sesion', 'Cerró sesión');
     setCurrentUserId(null);
     setIsRequestsDrawerOpen(false);
     setIsAdminModalOpen(false);
@@ -475,6 +520,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       createdAt: today(),
     };
     setUsers((prev) => [...prev, newUser]);
+    log('cuenta_creada_admin', `Creó la cuenta de ${newUser.name} (${newUser.email}) con rol ${getRoleById(newUser.role).name}`);
     celebrate();
     return newUser;
   };
@@ -482,6 +528,8 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const isProtected = (u: StudentUser) => CREATOR_EMAILS.includes(u.email.toLowerCase().trim());
 
   const updateUserRole = (userId: string, newRole: string) => {
+    const t = users.find((u) => u.id === userId);
+    if (t && !isProtected(t)) log('cambio_rol', `${t.name}: ${getRoleById(t.role).name} → ${getRoleById(newRole).name}`);
     setUsers((prev) =>
       prev.map((u) => (u.id === userId && !isProtected(u) ? { ...u, role: newRole } : u))
     );
@@ -494,6 +542,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const deleteUser = (userId: string): boolean => {
     const target = users.find((u) => u.id === userId);
     if (!target || isProtected(target) || target.id === currentUserId) return false;
+    log('cuenta_eliminada', `Eliminó la cuenta de ${target.name} (${target.email})`);
     setUsers((prev) => prev.filter((u) => u.id !== userId));
     return true;
   };
@@ -562,15 +611,20 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       aiAudit: data.aiAudit,
     };
     setPublications((prev) => [newPub, ...prev]);
+    log('publicacion', `Publicó "${newPub.title}" (${newPub.category}, ${newPub.exchangeType}${attachments.length ? `, ${attachments.length} archivo(s)` : ''})`);
     celebrate({ particleCount: 80 });
     return newPub;
   };
 
   const updatePublicationStatus = (pubId: string, status: Publication['status']) => {
+    const up = publications.find((p) => p.id === pubId);
+    if (up && up.status !== status) log('moderacion', `"${up.title}": ${up.status} → ${status}`);
     setPublications((prev) => prev.map((p) => (p.id === pubId ? { ...p, status } : p)));
   };
 
   const deletePublication = (pubId: string) => {
+    const dp = publications.find((p) => p.id === pubId);
+    if (dp) log('publicacion_eliminada', `Eliminó "${dp.title}" de ${dp.author.name}`);
     publications.find((p) => p.id === pubId)?.attachments?.forEach((a) => deleteFile(a.id));
     setPublications((prev) => prev.filter((p) => p.id !== pubId));
     setSelectedPublicationState((prev) => (prev?.id === pubId ? null : prev));
@@ -628,6 +682,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return { ...p, reviews, ratingAverage: stats.average, ratingCount: stats.total };
       })
     );
+    log('resena', `Valoró "${pub.title}" con ${newReview.rating} estrella(s)`);
     celebrate({ particleCount: 40 });
     return { ok: true };
   };
@@ -662,6 +717,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       createdAt: now(),
     };
     setRequests((prev) => [newRequest, ...prev]);
+    log('solicitud', `Solicitó intercambio de "${data.publicationTitle}" a ${data.receiverName}`);
     setPublications((prev) =>
       prev.map((p) => (p.id === data.publicationId ? { ...p, contactCount: p.contactCount + 1 } : p))
     );
@@ -670,6 +726,8 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const updateRequestStatus = (requestId: string, status: ContactExchangeRequest['status']) => {
+    const rq = requests.find((r) => r.id === requestId);
+    if (rq) log('solicitud_respondida', `Solicitud de ${rq.senderName} sobre "${rq.publicationTitle}": ${status}`);
     setRequests((prev) => prev.map((r) => (r.id === requestId ? { ...r, status } : r)));
   };
 
@@ -685,6 +743,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       createdAt: now(),
     };
     setReports((prev) => [newReport, ...prev]);
+    log('reporte', `Reportó "${data.publicationTitle}" (${data.reason})`);
     return { ok: true };
   };
 
@@ -701,6 +760,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const resetDatabase = () => {
     setLibraryRatings({});
+    setActivity([]);
     clearFiles();
     setPublications(INITIAL_PUBLICATIONS);
     setUsers(INITIAL_USERS);
@@ -772,6 +832,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         deleteUser,
         resetDatabase,
         libraryRatings,
+        activity,
         rateLibraryResource,
       }}
     >
