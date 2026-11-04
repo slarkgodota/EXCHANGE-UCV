@@ -48,6 +48,7 @@
     --color-indigo-600: oklch(51.1% 0.262 276.966);
     --color-violet-100: oklch(94.3% 0.029 294.588);
     --color-violet-700: oklch(49.1% 0.27 292.581);
+    --color-violet-800: oklch(43.2% 0.232 292.759);
     --color-rose-50: oklch(96.9% 0.015 12.422);
     --color-rose-100: oklch(94.1% 0.03 12.58);
     --color-rose-500: oklch(64.5% 0.246 16.439);
@@ -631,6 +632,9 @@
   }
   .min-w-4 {
     min-width: calc(var(--spacing) * 4);
+  }
+  .min-w-\[720px\] {
+    min-width: 720px;
   }
   .min-w-\[820px\] {
     min-width: 820px;
@@ -1376,6 +1380,9 @@
   .text-right {
     text-align: right;
   }
+  .align-top {
+    vertical-align: top;
+  }
   .font-display {
     font-family: var(--font-display);
   }
@@ -1604,6 +1611,9 @@
   }
   .text-violet-700 {
     color: var(--color-violet-700);
+  }
+  .text-violet-800 {
+    color: var(--color-violet-800);
   }
   .text-white {
     color: var(--color-white);
@@ -2040,6 +2050,9 @@
     }
     .sm\:w-52 {
       width: calc(var(--spacing) * 52);
+    }
+    .sm\:w-56 {
+      width: calc(var(--spacing) * 56);
     }
     .sm\:grid-cols-2 {
       grid-template-columns: repeat(2, minmax(0, 1fr));
