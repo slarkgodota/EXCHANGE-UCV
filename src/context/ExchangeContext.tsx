@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { Session, User } from '@supabase/supabase-js';
 import confetti from 'canvas-confetti';
 import {
   Publication,
   StudentUser,
+  PublicAuthor,
   Review,
   ContactExchangeRequest,
   PlagiarismReport,
@@ -20,58 +20,52 @@ import {
   INITIAL_REQUESTS,
   INITIAL_REPORTS,
   DEFAULT_ROLES,
+  ADMIN_EMAIL,
 } from '../data/initialData';
 import { calculateRatingDistribution } from '../utils/exchangeLogic';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { putFile, deleteFile, clearFiles } from '../utils/fileStore';
+import {
+  generateSalt,
+  hashPassword,
+  verifyPassword,
+  validateRegistration,
+} from '../utils/security';
 
-interface AuthResult {
-  success: boolean;
-  message?: string;
-  needsEmailConfirmation?: boolean;
+export type AuthMode = 'login' | 'register';
+
+export interface ActionResult {
+  ok: boolean;
+  error?: string;
 }
 
-const toStudentUser = (user: User): StudentUser => {
-  const fullName = user.user_metadata.full_name;
+export interface RegisterInput {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  career: CareerType;
+  campus: CampusType;
+  cycle: string;
+  phone?: string;
+  acceptedTerms: boolean;
+}
 
-  return {
-    id: user.id,
-    name:
-      typeof fullName === 'string' && fullName.trim()
-        ? fullName.trim()
-        : user.email?.split('@')[0] || 'Usuario',
-    email: user.email || '',
-    role: 'student',
-    career: 'General / Interdisciplinario',
-    campus: 'Lima Norte',
-    cycle: 'Ciclo I',
-    avatar:
-      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=250&q=80',
-    verified: false,
-    ratingAverage: 0,
-    ratingCount: 0,
-    bio: 'Miembro de Exchange UCV.',
-  };
-};
-
-const authErrorMessage = (message: string): string => {
-  const normalized = message.toLowerCase();
-  if (normalized.includes('invalid login credentials')) {
-    return 'El correo o la contraseña no son correctos.';
-  }
-  if (normalized.includes('user already registered')) {
-    return 'Ya existe una cuenta con ese correo. Inicia sesión.';
-  }
-  if (normalized.includes('email not confirmed')) {
-    return 'Confirma tu correo antes de iniciar sesión.';
-  }
-  if (normalized.includes('password should be at least')) {
-    return 'La contraseña no cumple los requisitos mínimos.';
-  }
-  if (normalized.includes('invalid email')) {
-    return 'Ingresa un correo electrónico válido.';
-  }
-  return `No se pudo completar la autenticación: ${message}`;
-};
+export interface NewPublicationInput {
+  title: string;
+  description: string;
+  category: CategoryType;
+  career: CareerType;
+  course: string;
+  cycleLevel: string;
+  tags: string[];
+  exchangeType: Publication['exchangeType'];
+  fileType?: Publication['fileType'];
+  intent: NonNullable<Publication['intent']>;
+  resourceType: NonNullable<Publication['resourceType']>;
+  resourceUrl?: string;
+  aiAudit?: AIOriginalityAuditResult;
+  files?: File[];
+}
 
 interface ExchangeContextType {
   publications: Publication[];
@@ -82,6 +76,7 @@ interface ExchangeContextType {
   reports: PlagiarismReport[];
   filter: FilterState;
   setFilter: React.Dispatch<React.SetStateAction<FilterState>>;
+  resetFilter: () => void;
   selectedPublication: Publication | null;
   setSelectedPublication: (pub: Publication | null) => void;
   isCreateModalOpen: boolean;
@@ -96,23 +91,14 @@ interface ExchangeContextType {
   setIsProjectInfoModalOpen: (open: boolean) => void;
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (open: boolean) => void;
+  authMode: AuthMode;
+  openAuth: (mode?: AuthMode) => void;
   isCreatorOrAdmin: boolean;
   isOwner: boolean;
-  
-  // Actions
-  addPublication: (data: {
-    title: string;
-    description: string;
-    category: CategoryType;
-    career: CareerType;
-    course: string;
-    cycleLevel: string;
-    tags: string[];
-    exchangeType: 'Intercambio Académico' | 'Gratuito / RSU' | 'Colaboración en Equipo';
-    fileType?: 'PDF' | 'DOCX' | 'ZIP' | 'XLSX' | 'Sesión Google Meet';
-    fileSize?: string;
-    aiAudit?: AIOriginalityAuditResult;
-  }) => Publication;
+
+  addPublication: (data: NewPublicationInput) => Promise<Publication | null>;
+  /** ¿Puede el usuario actual descargar los adjuntos? (gratuito, o intercambio aceptado) */
+  canDownload: (pub: Publication) => { allowed: boolean; reason?: 'login' | 'request' | 'pending' };
   auditPublicationWithAI: (data: {
     title: string;
     course: string;
@@ -123,7 +109,9 @@ interface ExchangeContextType {
   }) => Promise<AIOriginalityAuditResult>;
   runAIAuditOnPublication: (pubId: string) => Promise<AIOriginalityAuditResult | null>;
   updatePublicationStatus: (pubId: string, status: Publication['status']) => void;
-  addReview: (publicationId: string, rating: number, comment: string) => void;
+  deletePublication: (pubId: string) => void;
+  recordResourceOpen: (pubId: string) => void;
+  addReview: (publicationId: string, rating: number, comment: string) => ActionResult;
   sendContactRequest: (data: {
     publicationId: string;
     publicationTitle: string;
@@ -132,24 +120,22 @@ interface ExchangeContextType {
     receiverName: string;
     message: string;
     proposedExchange: string;
-  }) => void;
+  }) => ActionResult;
   updateRequestStatus: (requestId: string, status: ContactExchangeRequest['status']) => void;
   reportPublication: (data: {
     publicationId: string;
     publicationTitle: string;
     reason: PlagiarismReport['reason'];
     details: string;
-  }) => void;
+  }) => ActionResult;
   resolveReport: (reportId: string, newStatus: PlagiarismReport['status']) => void;
-  loginUser: (email: string, password: string) => Promise<AuthResult>;
-  continueAsGuest: () => void;
-  switchUser: (userId: string) => void;
-  logoutUser: () => Promise<AuthResult>;
-  registerUser: (name: string, email: string, password: string) => Promise<AuthResult>;
-  authLoading: boolean;
-  authStatusMessage: string | null;
-  clearAuthStatusMessage: () => void;
-  isSupabaseConfigured: boolean;
+
+  loginUser: (email: string, password: string) => ActionResult;
+  logoutUser: () => void;
+  registerUser: (data: RegisterInput) => ActionResult;
+  changePassword: (currentPassword: string, newPassword: string) => ActionResult;
+  updateProfile: (data: Partial<Pick<StudentUser, 'name' | 'career' | 'campus' | 'cycle' | 'phone' | 'bio' | 'orcid'>>) => void;
+
   roles: RoleDefinition[];
   createRole: (roleData: Omit<RoleDefinition, 'isSystem'>) => RoleDefinition;
   updateRole: (roleId: string, roleData: Partial<RoleDefinition>) => void;
@@ -159,6 +145,7 @@ interface ExchangeContextType {
   createUserByAdmin: (userData: {
     name: string;
     email: string;
+    password: string;
     role: string;
     career: CareerType;
     campus: CampusType;
@@ -167,80 +154,104 @@ interface ExchangeContextType {
     bio?: string;
   }) => StudentUser;
   updateUserRole: (userId: string, newRole: string) => void;
+  setUserVerified: (userId: string, verified: boolean) => void;
   deleteUser: (userId: string) => boolean;
   resetDatabase: () => void;
+  libraryRatings: LibraryRatings;
+  rateLibraryResource: (resourceId: string, stars: number) => ActionResult;
 }
 
 const ExchangeContext = createContext<ExchangeContextType | undefined>(undefined);
 
-// Use a clean namespace for the public demo's fictional sample data.
+// v5: contraseñas con hash y sin datos de demostración. Las claves v4 (con datos
+// ficticios) se ignoran a propósito.
 const STORAGE_KEYS = {
-  PUBLICATIONS: 'exchange_ucv_publications_demo_v1',
-  USERS: 'exchange_ucv_users_demo_v1',
-  ROLES: 'exchange_ucv_roles_demo_v1',
-  CURRENT_USER_ID: 'exchange_ucv_current_user_demo_v1',
-  REQUESTS: 'exchange_ucv_requests_demo_v1',
-  REPORTS: 'exchange_ucv_reports_demo_v1',
-  IS_LOGGED_IN: 'exchange_ucv_is_logged_in_demo_v1',
+  PUBLICATIONS: 'exchange_ucv_publications_v5',
+  USERS: 'exchange_ucv_users_v5',
+  ROLES: 'exchange_ucv_roles_v5',
+  CURRENT_USER_ID: 'exchange_ucv_current_user_v5',
+  REQUESTS: 'exchange_ucv_requests_v5',
+  REPORTS: 'exchange_ucv_reports_v5',
+  LIBRARY_RATINGS: 'exchange_ucv_library_ratings_v5',
 };
 
-const DEFAULT_FILTER: FilterState = {
+/** recurso de biblioteca → { usuario → estrellas (1-5) } */
+export type LibraryRatings = Record<string, Record<string, number>>;
+
+export const DEFAULT_FILTER: FilterState = {
   category: 'todas',
   career: 'todas',
   searchQuery: '',
   campus: 'todos',
-  sortBy: 'relevance',
+  intent: 'todos',
+  resourceType: 'todos',
+  course: '',
+  sortBy: 'newest',
   minRating: 0,
 };
 
-export const CREATOR_EMAILS: string[] = [];
+/** Autores del proyecto (Grupo 5). Sus cuentas no se pueden eliminar ni degradar. */
+export const CREATOR_EMAILS = [
+  ADMIN_EMAIL,
+  'mdelgadoc@ucvvirtual.edu.pe',
+  'jgonzalezg@ucvvirtual.edu.pe',
+  'mgrandeza@ucvvirtual.edu.pe',
+];
 
-export const OWNER_EMAIL = '';
+function loadJSON<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveJSON(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    console.warn('No se pudo guardar en localStorage', e);
+  }
+}
+
+const now = () => new Date().toISOString().replace('T', ' ').substring(0, 16);
+const today = () => new Date().toISOString().split('T')[0];
+const newId = (prefix: string) =>
+  `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+const celebrate = (opts: Record<string, unknown> = {}) => {
+  try {
+    confetti({ particleCount: 60, spread: 55, ...opts });
+  } catch {
+    /* confetti es decorativo */
+  }
+};
+
+export function toPublicAuthor(u: StudentUser): PublicAuthor {
+  const { passwordHash, passwordSalt, phone, email, ...rest } = u;
+  return rest;
+}
 
 export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [publications, setPublications] = useState<Publication[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.PUBLICATIONS);
-      return saved ? JSON.parse(saved) : INITIAL_PUBLICATIONS;
-    } catch {
-      return INITIAL_PUBLICATIONS;
-    }
-  });
+  const [publications, setPublications] = useState<Publication[]>(() =>
+    loadJSON(STORAGE_KEYS.PUBLICATIONS, INITIAL_PUBLICATIONS)
+  );
 
-  // Public demo profiles are fictional and have no login credentials.
   const [users, setUsers] = useState<StudentUser[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.USERS);
-      if (saved) {
-        const parsed: (StudentUser & { password?: string })[] = JSON.parse(saved);
-        return parsed.map(({ password: _password, ...user }) => user);
-      }
-      return INITIAL_USERS;
-    } catch {
-      return INITIAL_USERS;
-    }
+    const saved = loadJSON<StudentUser[]>(STORAGE_KEYS.USERS, []);
+    const valid = saved.filter((u) => u && u.email && u.passwordHash && u.passwordSalt);
+    // Las cuentas de los autores siempre existen
+    const missingFounders = INITIAL_USERS.filter(
+      (f) => !valid.some((u) => u.email.toLowerCase() === f.email.toLowerCase())
+    );
+    return [...missingFounders, ...valid];
   });
 
-  // Dynamic system and custom roles
   const [roles, setRoles] = useState<RoleDefinition[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.ROLES);
-      if (saved) {
-        const parsed: RoleDefinition[] = JSON.parse(saved);
-        const missing = DEFAULT_ROLES.filter((dr) => !parsed.some((pr) => pr.id === dr.id));
-        return [...parsed, ...missing];
-      }
-      return DEFAULT_ROLES;
-    } catch {
-      return DEFAULT_ROLES;
-    }
+    const saved = loadJSON<RoleDefinition[]>(STORAGE_KEYS.ROLES, []);
+    const missing = DEFAULT_ROLES.filter((dr) => !saved.some((pr) => pr.id === dr.id));
+    return [...saved, ...missing];
   });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.ROLES, JSON.stringify(roles));
-    } catch {}
-  }, [roles]);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
     try {
@@ -250,491 +261,258 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   });
 
-  const [isGuestSession, setIsGuestSession] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(STORAGE_KEYS.IS_LOGGED_IN) === 'true';
-    } catch {
-      return false;
-    }
-  });
-  const [authUser, setAuthUser] = useState<StudentUser | null>(null);
-  const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
-  const [authStatusMessage, setAuthStatusMessage] = useState<string | null>(null);
-  const isLoggedIn = Boolean(authUser || (isGuestSession && currentUserId));
+  const [requests, setRequests] = useState<ContactExchangeRequest[]>(() =>
+    loadJSON(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS)
+  );
+  const [reports, setReports] = useState<PlagiarismReport[]>(() =>
+    loadJSON(STORAGE_KEYS.REPORTS, INITIAL_REPORTS)
+  );
 
-  const [requests, setRequests] = useState<ContactExchangeRequest[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.REQUESTS);
-      return saved ? JSON.parse(saved) : INITIAL_REQUESTS;
-    } catch {
-      return INITIAL_REQUESTS;
-    }
-  });
-
-  const [reports, setReports] = useState<PlagiarismReport[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.REPORTS);
-      return saved ? JSON.parse(saved) : INITIAL_REPORTS;
-    } catch {
-      return INITIAL_REPORTS;
-    }
-  });
+  const [libraryRatings, setLibraryRatings] = useState<LibraryRatings>(() =>
+    loadJSON(STORAGE_KEYS.LIBRARY_RATINGS, {})
+  );
+  useEffect(() => saveJSON(STORAGE_KEYS.LIBRARY_RATINGS, libraryRatings), [libraryRatings]);
 
   const [filter, setFilter] = useState<FilterState>(DEFAULT_FILTER);
-  const [selectedPublication, setSelectedPublication] = useState<Publication | null>(null);
+  const [selectedPublication, setSelectedPublicationState] = useState<Publication | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [isRequestsDrawerOpen, setIsRequestsDrawerOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [isProjectInfoModalOpen, setIsProjectInfoModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode>('login');
 
-  // Requirement: "al entrar la pagina debe aparecer para iniciar seccion o registrarse"
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => {
-    // If not logged in initially, open the Auth modal on page entry
+  const currentUser = users.find((u) => u.id === currentUserId) || null;
+  const isLoggedIn = Boolean(currentUser);
+
+  // Al entrar a la página sin sesión se muestra el acceso (iniciar sesión o registrarse)
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => !currentUser);
+
+  useEffect(() => saveJSON(STORAGE_KEYS.PUBLICATIONS, publications), [publications]);
+  useEffect(() => saveJSON(STORAGE_KEYS.USERS, users), [users]);
+  useEffect(() => saveJSON(STORAGE_KEYS.ROLES, roles), [roles]);
+  useEffect(() => saveJSON(STORAGE_KEYS.REQUESTS, requests), [requests]);
+  useEffect(() => saveJSON(STORAGE_KEYS.REPORTS, reports), [reports]);
+  useEffect(() => {
     try {
-      return localStorage.getItem(STORAGE_KEYS.IS_LOGGED_IN) !== 'true';
+      if (currentUserId) localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, currentUserId);
+      else localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
     } catch {
-      return true;
+      /* ignore */
     }
-  });
+  }, [currentUserId]);
 
+  // Mantener sincronizada la publicación abierta en el modal
+  const setSelectedPublication = (pub: Publication | null) => setSelectedPublicationState(pub);
   useEffect(() => {
-    if (!supabase) {
-      setAuthLoading(false);
-      return;
-    }
-
-    let active = true;
-    const applySession = (session: Session | null) => {
-      if (!active) return;
-
-      if (session?.user) {
-        setAuthUser(toStudentUser(session.user));
-        setCurrentUserId(null);
-        setIsGuestSession(false);
-        setIsAuthModalOpen(false);
-        setAuthStatusMessage(null);
-      }
-      setAuthLoading(false);
-    };
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      applySession(session);
-      if (event === 'SIGNED_OUT') {
-        setAuthUser(null);
-        setCurrentUserId(null);
-        setIsGuestSession(false);
-        setIsAuthModalOpen(true);
-      }
-    });
-
-    void supabase.auth
-      .getSession()
-      .then(({ data, error }) => {
-        if (error && active) {
-          console.error('Could not restore the Supabase session.', error);
-          setAuthStatusMessage('No se pudo comprobar tu sesión. Intenta iniciar sesión de nuevo.');
-        }
-        applySession(data.session);
-      })
-      .catch((error: unknown) => {
-        console.error('Could not restore the Supabase session.', error);
-        if (active) {
-          setAuthLoading(false);
-          setAuthStatusMessage('No se pudo comprobar tu sesión. Intenta iniciar sesión de nuevo.');
-        }
-      });
-
-    return () => {
-      active = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  // Sync state to local storage
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.PUBLICATIONS, JSON.stringify(publications));
-    } catch (e) {
-      console.warn('LocalStorage error', e);
-    }
+    if (!selectedPublication) return;
+    const updated = publications.find((p) => p.id === selectedPublication.id);
+    setSelectedPublicationState(updated || null);
   }, [publications]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-    } catch (e) {
-      console.warn('LocalStorage error', e);
-    }
-  }, [users]);
-
-  useEffect(() => {
-    try {
-      if (authUser) {
-        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
-        localStorage.setItem(STORAGE_KEYS.IS_LOGGED_IN, 'false');
-      } else if (isGuestSession && currentUserId) {
-        localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, currentUserId);
-        localStorage.setItem(STORAGE_KEYS.IS_LOGGED_IN, 'true');
-      } else {
-        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
-        localStorage.setItem(STORAGE_KEYS.IS_LOGGED_IN, 'false');
-      }
-    } catch (e) {
-      console.warn('LocalStorage error', e);
-    }
-  }, [authUser, currentUserId, isGuestSession]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(requests));
-    } catch (e) {
-      console.warn('LocalStorage error', e);
-    }
-  }, [requests]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(reports));
-    } catch (e) {
-      console.warn('LocalStorage error', e);
-    }
-  }, [reports]);
-
-  // Keep selectedPublication updated
-  useEffect(() => {
-    if (selectedPublication) {
-      const updated = publications.find((p) => p.id === selectedPublication.id);
-      if (updated) {
-        setSelectedPublication(updated);
-      }
-    }
-  }, [publications]);
-
-  const currentUser =
-    authUser || (isGuestSession ? users.find((u) => u.id === currentUserId) || null : null);
-
-  const getRoleById = (roleId: string): RoleDefinition => {
-    const found = roles.find((r) => r.id === roleId);
-    if (found) return found;
-    return (
-      DEFAULT_ROLES.find((r) => r.id === roleId) || {
-        id: roleId,
-        name: roleId.charAt(0).toUpperCase() + roleId.slice(1),
-        description: 'Rol institucional UCV',
-        badgeColor: 'blue',
-        iconName: 'user-check',
-        isSystem: false,
-        permissions: {
-          canPublish: true,
-          canAccessAdminPanel: false,
-          canManageUsers: false,
-          canManageRoles: false,
-          canAuditAI: false,
-          canModeratePublications: false,
-          canExportData: false,
-        },
-      }
-    );
+  const openAuth = (mode: AuthMode = 'login') => {
+    setAuthMode(mode);
+    setIsAuthModalOpen(true);
   };
 
-  const currentUserRole = currentUser ? getRoleById(currentUser.role) : undefined;
+  const resetFilter = () => setFilter(DEFAULT_FILTER);
 
-  const isOwner = Boolean(
-    currentUser &&
-      (currentUser.email.toLowerCase().trim() === OWNER_EMAIL ||
-        currentUser.role === 'dueño' ||
-        CREATOR_EMAILS.includes(currentUser.email.toLowerCase().trim()))
+  // ───────────── Roles y permisos ─────────────
+  const getRoleById = (roleId: string): RoleDefinition => {
+    const found = roles.find((r) => r.id === roleId) || DEFAULT_ROLES.find((r) => r.id === roleId);
+    if (found) return found;
+    return {
+      id: roleId,
+      name: roleId.charAt(0).toUpperCase() + roleId.slice(1),
+      description: 'Rol personalizado',
+      badgeColor: 'blue',
+      iconName: 'user-check',
+      isSystem: false,
+      permissions: {
+        canPublish: true,
+        canAccessAdminPanel: false,
+        canManageUsers: false,
+        canManageRoles: false,
+        canAuditAI: false,
+        canModeratePublications: false,
+        canExportData: false,
+      },
+    };
+  };
+
+  const currentRole = currentUser ? getRoleById(currentUser.role) : undefined;
+  const isFounder = Boolean(
+    currentUser && CREATOR_EMAILS.includes(currentUser.email.toLowerCase().trim())
   );
-
+  const isOwner = Boolean(currentUser && (isFounder || currentUser.role === 'dueño'));
   const isCreatorOrAdmin = Boolean(
-    currentUser &&
-      (isOwner ||
-        currentUser.role === 'admin' ||
-        currentUser.role === 'dueño' ||
-        currentUserRole?.permissions.canAccessAdminPanel ||
-        CREATOR_EMAILS.includes(currentUser.email.toLowerCase().trim()))
+    currentUser && (isOwner || currentRole?.permissions.canAccessAdminPanel)
   );
-
-  const canManageRoles = Boolean(
-    currentUser &&
-      (isOwner ||
-        currentUser.role === 'dueño' ||
-        currentUserRole?.permissions.canManageRoles ||
-        CREATOR_EMAILS.includes(currentUser.email.toLowerCase().trim()))
-  );
+  const canManageRoles = Boolean(currentUser && (isOwner || currentRole?.permissions.canManageRoles));
 
   const createRole = (roleData: Omit<RoleDefinition, 'isSystem'>): RoleDefinition => {
     const newRole: RoleDefinition = {
       ...roleData,
-      id: roleData.id?.trim() || `role-${Date.now()}`,
+      id: roleData.id?.trim() || newId('role'),
       isSystem: false,
     };
     setRoles((prev) => [...prev, newRole]);
-    try {
-      confetti({ particleCount: 50, spread: 60 });
-    } catch {}
+    celebrate({ particleCount: 40 });
     return newRole;
   };
 
   const updateRole = (roleId: string, roleData: Partial<RoleDefinition>) => {
-    setRoles((prev) =>
-      prev.map((r) => (r.id === roleId ? { ...r, ...roleData } : r))
-    );
+    setRoles((prev) => prev.map((r) => (r.id === roleId ? { ...r, ...roleData } : r)));
   };
 
   const deleteRole = (roleId: string): boolean => {
     const target = roles.find((r) => r.id === roleId);
     if (!target || target.isSystem) return false;
-    setUsers((prev) =>
-      prev.map((u) => (u.role === roleId ? { ...u, role: 'student' } : u))
-    );
+    setUsers((prev) => prev.map((u) => (u.role === roleId ? { ...u, role: 'student' } : u)));
     setRoles((prev) => prev.filter((r) => r.id !== roleId));
     return true;
   };
 
-  const loginUser = async (email: string, password: string): Promise<AuthResult> => {
-    if (!supabase) {
-      return {
-        success: false,
-        message: 'El inicio de sesión aún no está configurado. Conecta el proyecto Supabase.',
-      };
+  // ───────────── Autenticación ─────────────
+  const loginUser = (email: string, password: string): ActionResult => {
+    const target = email.toLowerCase().trim();
+    const found = users.find((u) => u.email.toLowerCase().trim() === target);
+    if (!found || !verifyPassword(password, found.passwordSalt, found.passwordHash)) {
+      return { ok: false, error: 'Correo o contraseña incorrectos.' };
     }
-
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-      if (error) return { success: false, message: authErrorMessage(error.message) };
-
-      setAuthStatusMessage(null);
-      setIsAuthModalOpen(false);
-      try {
-        confetti({ particleCount: 50, spread: 50 });
-      } catch {}
-      return { success: true };
-    } catch (error) {
-      console.error('Supabase sign-in request failed.', error);
-      return {
-        success: false,
-        message:
-          error instanceof Error
-            ? `No se pudo conectar para iniciar sesión: ${error.message}`
-            : 'No se pudo conectar para iniciar sesión. Inténtalo de nuevo.',
-      };
-    }
-  };
-
-  const continueAsGuest = () => {
-    if (authUser) {
-      setIsAuthModalOpen(false);
-      return;
-    }
-    setCurrentUserId(INITIAL_USERS[0].id);
-    setIsGuestSession(true);
+    setCurrentUserId(found.id);
     setIsAuthModalOpen(false);
+    celebrate({ particleCount: 40 });
+    return { ok: true };
   };
 
-  const createUserByAdmin = (userData: {
-    name: string;
-    email: string;
-    role: string;
-    career: CareerType;
-    campus: CampusType;
-    cycle: string;
-    phone?: string;
-    bio?: string;
-  }): StudentUser => {
-    const avatarChoice =
-      userData.role === 'docente'
-        ? 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=250&q=80'
-        : userData.role === 'admin' || userData.role === 'dueño'
-        ? 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=250&q=80'
-        : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=250&q=80';
+  const registerUser = (data: RegisterInput): ActionResult => {
+    const error = validateRegistration({
+      name: data.name,
+      email: data.email,
+      password: data.password,
+      confirmPassword: data.confirmPassword,
+      existingEmails: users.map((u) => u.email),
+      acceptedTerms: data.acceptedTerms,
+    });
+    if (error) return { ok: false, error };
 
+    const salt = generateSalt();
     const newUser: StudentUser = {
-      id: `u-${Date.now()}`,
-      name: userData.name.trim(),
-      email: userData.email.trim().toLowerCase(),
-      role: userData.role,
-      career: userData.career,
-      campus: userData.campus,
-      cycle: userData.cycle || (userData.role === 'docente' ? 'Catedrático' : 'Ciclo I'),
-      avatar: avatarChoice,
-      verified: true,
-      ratingAverage: 5.0,
+      id: newId('u'),
+      name: data.name.trim(),
+      email: data.email.trim().toLowerCase(),
+      role: 'student',
+      career: data.career,
+      campus: data.campus,
+      cycle: data.cycle,
+      phone: data.phone?.trim() || undefined,
+      verified: false,
+      ratingAverage: 0,
       ratingCount: 0,
-      bio:
-        userData.bio?.trim() ||
-        `${userData.role} de ${userData.career} - Sede ${userData.campus}.`,
-      phone: userData.phone?.trim() || '',
+      bio: '',
+      passwordSalt: salt,
+      passwordHash: hashPassword(data.password, salt),
+      createdAt: today(),
     };
 
     setUsers((prev) => [...prev, newUser]);
-    try {
-      confetti({ particleCount: 60, spread: 55 });
-    } catch {}
+    setCurrentUserId(newUser.id);
+    setIsAuthModalOpen(false);
+    celebrate({ particleCount: 80, origin: { y: 0.6 } });
+    return { ok: true };
+  };
+
+  const logoutUser = () => {
+    setCurrentUserId(null);
+    setIsRequestsDrawerOpen(false);
+    setIsAdminModalOpen(false);
+    openAuth('login');
+  };
+
+  const changePassword = (currentPassword: string, newPassword: string): ActionResult => {
+    if (!currentUser) return { ok: false, error: 'Inicia sesión primero.' };
+    if (!verifyPassword(currentPassword, currentUser.passwordSalt, currentUser.passwordHash)) {
+      return { ok: false, error: 'La contraseña actual no es correcta.' };
+    }
+    if (newPassword.length < 8 || !/[A-Za-z]/.test(newPassword) || !/\d/.test(newPassword)) {
+      return { ok: false, error: 'La nueva contraseña debe tener 8+ caracteres con letras y números.' };
+    }
+    const salt = generateSalt();
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === currentUser.id
+          ? { ...u, passwordSalt: salt, passwordHash: hashPassword(newPassword, salt) }
+          : u
+      )
+    );
+    return { ok: true };
+  };
+
+  const updateProfile: ExchangeContextType['updateProfile'] = (data) => {
+    if (!currentUser) return;
+    setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? { ...u, ...data } : u)));
+  };
+
+  // ───────────── Gestión de usuarios (admin) ─────────────
+  const createUserByAdmin: ExchangeContextType['createUserByAdmin'] = (userData) => {
+    const salt = generateSalt();
+    const newUser: StudentUser = {
+      id: newId('u'),
+      name: userData.name.trim(),
+      email: userData.email.trim().toLowerCase(),
+      passwordSalt: salt,
+      passwordHash: hashPassword(userData.password, salt),
+      role: userData.role,
+      career: userData.career,
+      campus: userData.campus,
+      cycle: userData.cycle,
+      verified: true,
+      ratingAverage: 0,
+      ratingCount: 0,
+      bio: userData.bio?.trim() || '',
+      phone: userData.phone?.trim() || undefined,
+      createdAt: today(),
+    };
+    setUsers((prev) => [...prev, newUser]);
+    celebrate();
     return newUser;
   };
 
+  const isProtected = (u: StudentUser) => CREATOR_EMAILS.includes(u.email.toLowerCase().trim());
+
   const updateUserRole = (userId: string, newRole: string) => {
     setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === userId) {
-          // Cannot demote root Grupo 5 founders
-          if (CREATOR_EMAILS.includes(u.email.toLowerCase().trim())) {
-            return u;
-          }
-          return { ...u, role: newRole };
-        }
-        return u;
-      })
+      prev.map((u) => (u.id === userId && !isProtected(u) ? { ...u, role: newRole } : u))
     );
+  };
+
+  const setUserVerified = (userId: string, verified: boolean) => {
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, verified } : u)));
   };
 
   const deleteUser = (userId: string): boolean => {
     const target = users.find((u) => u.id === userId);
-    if (!target) return false;
-    if (CREATOR_EMAILS.includes(target.email.toLowerCase().trim())) {
-      return false; // Cannot delete Grupo 5 founders
-    }
+    if (!target || isProtected(target) || target.id === currentUserId) return false;
     setUsers((prev) => prev.filter((u) => u.id !== userId));
     return true;
   };
 
-  const switchUser = (userId: string) => {
-    if (authUser) return;
-    const found = users.find((u) => u.id === userId);
-    if (found) {
-      setCurrentUserId(found.id);
-      setIsGuestSession(true);
-      setIsAuthModalOpen(false);
+  // ───────────── Auditoría con IA ─────────────
+  const auditPublicationWithAI: ExchangeContextType['auditPublicationWithAI'] = async (data) => {
+    const res = await fetch('/api/ai/audit-originality', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(body?.error || 'El servicio de auditoría con IA no está disponible.');
     }
+    return { ...(body as AIOriginalityAuditResult), analyzedAt: now() };
   };
 
-  const logoutUser = async (): Promise<AuthResult> => {
-    if (authUser && supabase) {
-      try {
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-          const message = `No se pudo cerrar sesión: ${error.message}`;
-          setAuthStatusMessage(message);
-          setIsAuthModalOpen(true);
-          return { success: false, message };
-        }
-      } catch (error) {
-        console.error('Supabase sign-out request failed.', error);
-        const message =
-          error instanceof Error
-            ? `No se pudo cerrar sesión: ${error.message}`
-            : 'No se pudo cerrar sesión. Inténtalo de nuevo.';
-        setAuthStatusMessage(message);
-        setIsAuthModalOpen(true);
-        return { success: false, message };
-      }
-    } else {
-      setCurrentUserId(null);
-      setIsGuestSession(false);
-      setAuthUser(null);
-      setIsAuthModalOpen(true);
-    }
-    return { success: true };
-  };
-
-  const registerUser = async (
-    name: string,
-    email: string,
-    password: string
-  ): Promise<AuthResult> => {
-    if (!supabase) {
-      return {
-        success: false,
-        message: 'El registro aún no está configurado. Conecta el proyecto Supabase.',
-      };
-    }
-
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
-        password,
-        options: {
-          data: { full_name: name.trim() },
-          emailRedirectTo: new URL(import.meta.env.BASE_URL, window.location.origin).toString(),
-        },
-      });
-      if (error) return { success: false, message: authErrorMessage(error.message) };
-
-      if (!data.session) {
-        return {
-          success: true,
-          needsEmailConfirmation: true,
-          message: 'Revisa tu correo y confirma la cuenta antes de iniciar sesión.',
-        };
-      }
-
-      setAuthStatusMessage(null);
-      setIsAuthModalOpen(false);
-      return { success: true };
-    } catch (error) {
-      console.error('Supabase sign-up request failed.', error);
-      return {
-        success: false,
-        message:
-          error instanceof Error
-            ? `No se pudo crear la cuenta: ${error.message}`
-            : 'No se pudo crear la cuenta. Inténtalo de nuevo.',
-      };
-    }
-  };
-
-  const clearAuthStatusMessage = () => setAuthStatusMessage(null);
-
-  const auditPublicationWithAI = async (data: {
-    title: string;
-    course: string;
-    career: CareerType;
-    description: string;
-    category: CategoryType;
-    exchangeType: string;
-  }): Promise<AIOriginalityAuditResult> => {
-    try {
-      const res = await fetch('/api/ai/audit-originality', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) {
-        throw new Error('Error al consultar el servicio de auditoría de IA.');
-      }
-      const result: AIOriginalityAuditResult = await res.json();
-      result.analyzedAt = new Date().toISOString().replace('T', ' ').substring(0, 16);
-      return result;
-    } catch (e: any) {
-      console.warn('Fallo en auditoría de IA, aplicando análisis de respaldo:', e);
-      return {
-        originalityScore: 92,
-        verdict: 'APROBADO_INTEGRO',
-        summary:
-          'Material evaluado bajo los lineamientos del Art. 10 de Exchange UCV. Contenido apto para intercambio y apoyo formativo entre pares.',
-        strengths: [
-          'Estructura orientada al refuerzo académico de la asignatura',
-          'Aporte de apuntes y ejercicios de clase verificados',
-        ],
-        suggestions: [
-          'Mantener citación en formato APA 7ma edición o Vancouver para fuentes de autores externos',
-        ],
-        academicIntegrityNote: 'Aprobado para consulta académica universitaria.',
-        analyzedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      };
-    }
-  };
-
-  const runAIAuditOnPublication = async (
-    pubId: string
-  ): Promise<AIOriginalityAuditResult | null> => {
+  const runAIAuditOnPublication = async (pubId: string) => {
     const pub = publications.find((p) => p.id === pubId);
     if (!pub) return null;
     const audit = await auditPublicationWithAI({
@@ -745,199 +523,194 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       category: pub.category,
       exchangeType: pub.exchangeType,
     });
-    setPublications((prev) =>
-      prev.map((p) => (p.id === pubId ? { ...p, aiAudit: audit } : p))
-    );
+    setPublications((prev) => prev.map((p) => (p.id === pubId ? { ...p, aiAudit: audit } : p)));
     return audit;
   };
 
-  const addPublication = (data: {
-    title: string;
-    description: string;
-    category: CategoryType;
-    career: CareerType;
-    course: string;
-    cycleLevel: string;
-    tags: string[];
-    exchangeType: 'Intercambio Académico' | 'Gratuito / RSU' | 'Colaboración en Equipo';
-    fileType?: 'PDF' | 'DOCX' | 'ZIP' | 'XLSX' | 'Sesión Google Meet';
-    fileSize?: string;
-    aiAudit?: AIOriginalityAuditResult;
-  }): Publication => {
-    const authorToUse = currentUser || INITIAL_USERS[0];
-    const defaultAudit: AIOriginalityAuditResult = {
-      originalityScore: 95,
-      verdict: 'APROBADO_INTEGRO',
-      summary:
-        'Verificado por el auditor de integridad UCV. Contenido formativo auténtico y pedagógico.',
-      strengths: ['Aporte académico estructurado', 'Sin indicios de vulneración de derechos de autor'],
-      suggestions: ['Mantener la citación correspondiente según normas UCV'],
-      academicIntegrityNote: 'Cumple el código de ética y uso responsable del Grupo 5.',
-      analyzedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-    };
-
+  // ───────────── Publicaciones ─────────────
+  const addPublication = async (data: NewPublicationInput): Promise<Publication | null> => {
+    if (!currentUser) return null;
+    const attachments: { id: string; name: string; size: number; type: string }[] = [];
+    for (const f of data.files || []) {
+      const id = newId('file');
+      await putFile(id, f);
+      attachments.push({ id, name: f.name, size: f.size, type: f.type });
+    }
     const newPub: Publication = {
-      id: `pub-${Date.now()}`,
-      title: data.title,
-      description: data.description,
+      attachments,
+      id: newId('pub'),
+      title: data.title.trim(),
+      description: data.description.trim(),
       category: data.category,
       career: data.career,
-      course: data.course,
-      author: authorToUse,
+      course: data.course.trim(),
+      author: toPublicAuthor(currentUser),
       cycleLevel: data.cycleLevel,
       tags: data.tags,
       exchangeType: data.exchangeType,
-      fileType: data.fileType || 'PDF',
-      fileSize: data.fileSize || '3.5 MB',
-      downloadCount: 1,
-      createdAt: new Date().toISOString().split('T')[0],
+      fileType: data.fileType,
+      intent: data.intent,
+      resourceType: data.resourceType,
+      resourceUrl: data.resourceUrl?.trim() || undefined,
+      downloadCount: 0,
+      createdAt: today(),
       status: 'aprobado',
-      ratingAverage: 5.0,
+      ratingAverage: 0,
       ratingCount: 0,
       reviews: [],
       contactCount: 0,
-      aiAudit: data.aiAudit || defaultAudit,
+      aiAudit: data.aiAudit,
     };
-
     setPublications((prev) => [newPub, ...prev]);
-    try {
-      confetti({
-        particleCount: 80,
-        spread: 60,
-      });
-    } catch {}
+    celebrate({ particleCount: 80 });
     return newPub;
   };
 
   const updatePublicationStatus = (pubId: string, status: Publication['status']) => {
+    setPublications((prev) => prev.map((p) => (p.id === pubId ? { ...p, status } : p)));
+  };
+
+  const deletePublication = (pubId: string) => {
+    publications.find((p) => p.id === pubId)?.attachments?.forEach((a) => deleteFile(a.id));
+    setPublications((prev) => prev.filter((p) => p.id !== pubId));
+    setSelectedPublicationState((prev) => (prev?.id === pubId ? null : prev));
+  };
+
+  const canDownload: ExchangeContextType['canDownload'] = (pub) => {
+    if (!currentUser) return { allowed: false, reason: 'login' };
+    if (pub.author.id === currentUser.id || isCreatorOrAdmin) return { allowed: true };
+    if (pub.exchangeType === 'Gratuito / RSU') return { allowed: true };
+    const mine = requests.filter((r) => r.publicationId === pub.id && r.senderId === currentUser.id);
+    if (mine.some((r) => r.status === 'aceptada' || r.status === 'completada')) return { allowed: true };
+    if (mine.some((r) => r.status === 'pendiente')) return { allowed: false, reason: 'pending' };
+    return { allowed: false, reason: 'request' };
+  };
+
+  const recordResourceOpen = (pubId: string) => {
     setPublications((prev) =>
-      prev.map((p) => (p.id === pubId ? { ...p, status } : p))
+      prev.map((p) => (p.id === pubId ? { ...p, downloadCount: p.downloadCount + 1 } : p))
     );
   };
 
-  const addReview = (publicationId: string, rating: number, comment: string) => {
-    const reviewer = currentUser || INITIAL_USERS[0];
+  const addReview = (publicationId: string, rating: number, comment: string): ActionResult => {
+    if (!currentUser) return { ok: false, error: 'Inicia sesión para dejar una reseña.' };
+    const pub = publications.find((p) => p.id === publicationId);
+    if (!pub) return { ok: false, error: 'La publicación ya no existe.' };
+    if (pub.author.id === currentUser.id) {
+      return { ok: false, error: 'No puedes calificar tu propia publicación.' };
+    }
+    if (pub.reviews.some((r) => r.authorId === currentUser.id)) {
+      return { ok: false, error: 'Ya dejaste una reseña en esta publicación.' };
+    }
+    const hadExchange = requests.some(
+      (r) =>
+        r.publicationId === publicationId &&
+        r.senderId === currentUser.id &&
+        (r.status === 'aceptada' || r.status === 'completada')
+    );
     const newReview: Review = {
-      id: `rev-${Date.now()}`,
+      id: newId('rev'),
       publicationId,
-      authorId: reviewer.id,
-      authorName: reviewer.name,
-      authorAvatar: reviewer.avatar,
-      authorCareer: reviewer.career,
-      rating: Math.min(5, Math.max(1, rating)),
-      comment,
-      createdAt: new Date().toISOString().split('T')[0],
-      verifiedExchange: true,
+      authorId: currentUser.id,
+      authorName: currentUser.name,
+      authorAvatar: currentUser.avatar,
+      authorCareer: currentUser.career,
+      rating: Math.min(5, Math.max(1, Math.round(rating))),
+      comment: comment.trim(),
+      createdAt: today(),
+      verifiedExchange: hadExchange,
     };
-
     setPublications((prev) =>
-      prev.map((pub) => {
-        if (pub.id !== publicationId) return pub;
-        const updatedReviews = [newReview, ...pub.reviews];
-        const stats = calculateRatingDistribution(updatedReviews);
-        return {
-          ...pub,
-          reviews: updatedReviews,
-          ratingAverage: stats.average,
-          ratingCount: stats.total,
-        };
+      prev.map((p) => {
+        if (p.id !== publicationId) return p;
+        const reviews = [newReview, ...p.reviews];
+        const stats = calculateRatingDistribution(reviews);
+        return { ...p, reviews, ratingAverage: stats.average, ratingCount: stats.total };
       })
     );
-
-    try {
-      confetti({ particleCount: 50, spread: 45 });
-    } catch {}
+    celebrate({ particleCount: 40 });
+    return { ok: true };
   };
 
-  const sendContactRequest = (data: {
-    publicationId: string;
-    publicationTitle: string;
-    publicationCategory: CategoryType;
-    receiverId: string;
-    receiverName: string;
-    message: string;
-    proposedExchange: string;
-  }) => {
-    const sender = currentUser || INITIAL_USERS[0];
+  // ───────────── Solicitudes de intercambio ─────────────
+  const sendContactRequest: ExchangeContextType['sendContactRequest'] = (data) => {
+    if (!currentUser) return { ok: false, error: 'Inicia sesión para enviar solicitudes.' };
+    if (data.receiverId === currentUser.id) {
+      return { ok: false, error: 'Esta publicación es tuya.' };
+    }
+    if (publications.find((p) => p.id === data.publicationId)?.exchangeType === 'Gratuito / RSU') {
+      return { ok: false, error: 'Esta publicación es gratuita: puedes descargarla sin solicitar intercambio.' };
+    }
+    const duplicate = requests.some(
+      (r) =>
+        r.publicationId === data.publicationId &&
+        r.senderId === currentUser.id &&
+        r.status === 'pendiente'
+    );
+    if (duplicate) return { ok: false, error: 'Ya tienes una solicitud pendiente para esta publicación.' };
+
     const newRequest: ContactExchangeRequest = {
-      id: `req-${Date.now()}`,
-      publicationId: data.publicationId,
-      publicationTitle: data.publicationTitle,
-      publicationCategory: data.publicationCategory,
-      senderId: sender.id,
-      senderName: sender.name,
-      senderEmail: sender.email,
-      senderCareer: sender.career,
-      senderCampus: sender.campus,
-      senderPhone: sender.phone || '',
-      receiverId: data.receiverId,
-      receiverName: data.receiverName,
-      message: data.message,
-      proposedExchange: data.proposedExchange,
+      id: newId('req'),
+      ...data,
+      senderId: currentUser.id,
+      senderName: currentUser.name,
+      senderEmail: currentUser.email,
+      senderCareer: currentUser.career,
+      senderCampus: currentUser.campus,
+      senderPhone: currentUser.phone || '',
       status: 'pendiente',
-      createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      createdAt: now(),
     };
-
     setRequests((prev) => [newRequest, ...prev]);
-
     setPublications((prev) =>
-      prev.map((p) =>
-        p.id === data.publicationId ? { ...p, contactCount: p.contactCount + 1 } : p
-      )
+      prev.map((p) => (p.id === data.publicationId ? { ...p, contactCount: p.contactCount + 1 } : p))
     );
-
-    try {
-      confetti({ particleCount: 40, spread: 50 });
-    } catch {}
+    celebrate({ particleCount: 40 });
+    return { ok: true };
   };
 
-  const updateRequestStatus = (
-    requestId: string,
-    status: ContactExchangeRequest['status']
-  ) => {
-    setRequests((prev) =>
-      prev.map((r) => (r.id === requestId ? { ...r, status } : r))
-    );
+  const updateRequestStatus = (requestId: string, status: ContactExchangeRequest['status']) => {
+    setRequests((prev) => prev.map((r) => (r.id === requestId ? { ...r, status } : r)));
   };
 
-  const reportPublication = (data: {
-    publicationId: string;
-    publicationTitle: string;
-    reason: PlagiarismReport['reason'];
-    details: string;
-  }) => {
-    const reporter = currentUser || INITIAL_USERS[0];
+  // ───────────── Reportes ─────────────
+  const reportPublication: ExchangeContextType['reportPublication'] = (data) => {
+    if (!currentUser) return { ok: false, error: 'Inicia sesión para reportar.' };
     const newReport: PlagiarismReport = {
-      id: `rep-${Date.now()}`,
-      publicationId: data.publicationId,
-      publicationTitle: data.publicationTitle,
-      reporterName: reporter.name,
-      reporterEmail: reporter.email,
-      reason: data.reason,
-      details: data.details,
+      id: newId('rep'),
+      ...data,
+      reporterName: currentUser.name,
+      reporterEmail: currentUser.email,
       status: 'pendiente',
-      createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      createdAt: now(),
     };
     setReports((prev) => [newReport, ...prev]);
+    return { ok: true };
   };
 
   const resolveReport = (reportId: string, newStatus: PlagiarismReport['status']) => {
-    setReports((prev) =>
-      prev.map((rep) => (rep.id === reportId ? { ...rep, status: newStatus } : rep))
-    );
+    setReports((prev) => prev.map((r) => (r.id === reportId ? { ...r, status: newStatus } : r)));
+  };
+
+  const rateLibraryResource = (resourceId: string, stars: number): ActionResult => {
+    if (!currentUser) return { ok: false, error: 'Inicia sesión para valorar.' };
+    const value = Math.min(5, Math.max(1, Math.round(stars)));
+    setLibraryRatings((prev) => ({ ...prev, [resourceId]: { ...(prev[resourceId] || {}), [currentUser.id]: value } }));
+    return { ok: true };
   };
 
   const resetDatabase = () => {
+    setLibraryRatings({});
+    clearFiles();
     setPublications(INITIAL_PUBLICATIONS);
     setUsers(INITIAL_USERS);
     setRoles(DEFAULT_ROLES);
-    if (!authUser) {
-      setCurrentUserId(INITIAL_USERS[0].id);
-      setIsGuestSession(true);
-    }
     setRequests(INITIAL_REQUESTS);
     setReports(INITIAL_REPORTS);
     setFilter(DEFAULT_FILTER);
+    setCurrentUserId(null);
+    setIsAdminModalOpen(false);
+    openAuth('login');
   };
 
   return (
@@ -957,6 +730,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         canManageRoles,
         filter,
         setFilter,
+        resetFilter,
         selectedPublication,
         setSelectedPublication,
         isCreateModalOpen,
@@ -971,30 +745,34 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setIsProjectInfoModalOpen,
         isAuthModalOpen,
         setIsAuthModalOpen,
-        authLoading,
-        authStatusMessage,
-        clearAuthStatusMessage,
-        isSupabaseConfigured,
+        authMode,
+        openAuth,
         isCreatorOrAdmin,
         isOwner,
         addPublication,
+        canDownload,
         auditPublicationWithAI,
         runAIAuditOnPublication,
         updatePublicationStatus,
+        deletePublication,
+        recordResourceOpen,
         addReview,
         sendContactRequest,
         updateRequestStatus,
         reportPublication,
         resolveReport,
         loginUser,
-        continueAsGuest,
-        switchUser,
         logoutUser,
         registerUser,
+        changePassword,
+        updateProfile,
         createUserByAdmin,
         updateUserRole,
+        setUserVerified,
         deleteUser,
         resetDatabase,
+        libraryRatings,
+        rateLibraryResource,
       }}
     >
       {children}

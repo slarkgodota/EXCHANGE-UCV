@@ -7,6 +7,12 @@ import {
   ContactExchangeRequest,
   PlagiarismReport,
 } from '../types/exchange';
+import { EMAIL_REGEX } from './security';
+
+/** Minúsculas y sin tildes, para que "calculo" encuentre "Cálculo". */
+export function normalizeText(s: string): string {
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
 
 /**
  * Calculates average rating rounded to 1 decimal place,
@@ -78,6 +84,22 @@ export function filterPublications(
         return false;
       }
 
+      // Ofrece / busca (sección 8 del PDF)
+      if (filter.intent && filter.intent !== 'todos' && (pub.intent || 'ofrezco') !== filter.intent) {
+        return false;
+      }
+
+      // Tipo de recurso: resumen, apuntes, presentación, mapa conceptual…
+      if (filter.resourceType && filter.resourceType !== 'todos' && pub.resourceType !== filter.resourceType) {
+        return false;
+      }
+
+      // Curso
+      if (filter.course && filter.course.trim() !== '') {
+        const c = normalizeText(filter.course);
+        if (!normalizeText(pub.course).includes(c)) return false;
+      }
+
       // Filter by minimum rating
       if (filter.minRating > 0 && pub.ratingAverage < filter.minRating) {
         return false;
@@ -85,14 +107,11 @@ export function filterPublications(
 
       // Filter by search query (title, description, course, tags, author name)
       if (filter.searchQuery.trim() !== '') {
-        const query = filter.searchQuery.toLowerCase().trim();
-        const matchesTitle = pub.title.toLowerCase().includes(query);
-        const matchesDesc = pub.description.toLowerCase().includes(query);
-        const matchesCourse = pub.course.toLowerCase().includes(query);
-        const matchesAuthor = pub.author.name.toLowerCase().includes(query);
-        const matchesTags = pub.tags.some((t) => t.toLowerCase().includes(query));
-
-        if (!matchesTitle && !matchesDesc && !matchesCourse && !matchesAuthor && !matchesTags) {
+        const query = normalizeText(filter.searchQuery);
+        const haystack = normalizeText(
+          [pub.title, pub.description, pub.course, pub.author.name, pub.resourceType || '', ...pub.tags].join(' ')
+        );
+        if (!haystack.includes(query)) {
           return false;
         }
       }
@@ -108,11 +127,13 @@ export function filterPublications(
         case 'newest':
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         case 'relevance':
-        default:
-          // Boost featured and higher rated
+        default: {
+          // Destacados primero, luego mejor calificados, luego más recientes
           const scoreA = (a.status === 'destacado' ? 10 : 0) + a.ratingAverage * 2;
           const scoreB = (b.status === 'destacado' ? 10 : 0) + b.ratingAverage * 2;
-          return scoreB - scoreA;
+          if (scoreB !== scoreA) return scoreB - scoreA;
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        }
       }
     });
 }
@@ -144,7 +165,7 @@ export function validateNewPublication(data: {
     return 'La descripción debe tener al menos 20 caracteres para ser informativa.';
   }
   if (!data.academicIntegrityChecked) {
-    return 'Debes declarar que el contenido cumple las normas académicas y no contiene plagio.';
+    return 'Marca la declaración de responsabilidad para poder publicar.';
   }
   return null;
 }
@@ -169,7 +190,7 @@ export function calculateAdminMetrics(
       ? Math.round(
           (totalReviews.reduce((acc, r) => acc + r.rating, 0) / totalReviews.length) * 10
         ) / 10
-      : 5.0;
+      : 0;
 
   const pendingReports = reports.filter((r) => r.status === 'pendiente').length;
 
@@ -194,14 +215,18 @@ export function validateAdminCreateUser(data: {
   role: string;
   career: string;
   campus: string;
+  password: string;
   existingEmails: string[];
 }): string | null {
+  if (!data.password || data.password.length < 8 || !/[A-Za-z]/.test(data.password) || !/\d/.test(data.password)) {
+    return 'La contraseña inicial debe tener al menos 8 caracteres con letras y números.';
+  }
   if (!data.name || data.name.trim().length < 3) {
     return 'El nombre completo debe tener al menos 3 caracteres.';
   }
   const cleanEmail = data.email.trim().toLowerCase();
-  if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
-    return 'Por favor ingresa un correo electrónico institucional válido.';
+  if (!EMAIL_REGEX.test(cleanEmail)) {
+    return 'Por favor ingresa un correo electrónico válido.';
   }
   if (data.existingEmails.some((e) => e.toLowerCase().trim() === cleanEmail)) {
     return 'Este correo institucional ya se encuentra registrado en el padrón.';
@@ -227,3 +252,15 @@ export function canModifyRole(targetUserEmail: string, rootCreatorEmails: string
   return !rootCreatorEmails.some((e) => e.toLowerCase().trim() === cleanTarget);
 }
 
+
+/**
+ * Solo permite enlaces http(s) para evitar esquemas peligrosos como javascript:.
+ */
+export function isSafeHttpUrl(value: string): boolean {
+  try {
+    const u = new URL(value);
+    return u.protocol === 'https:' || u.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}

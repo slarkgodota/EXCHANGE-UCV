@@ -1,31 +1,71 @@
-# Exchange UCV
+# Exchange UCV — Plataforma académica colaborativa (Grupo 5)
 
-Aplicación académica colaborativa desarrollada con React, TypeScript y Vite.
+Prototipo estudiantil para que estudiantes de la **Universidad César Vallejo** compartan materiales, ofrezcan asesorías entre pares y formen equipos de investigación.
 
-## Configurar inicio de sesión
+> Proyecto de la Escuela Profesional de Ingeniería Civil, UCV Moyobamba (2026).
+> Autores: Delgado Cerdán, Michael Jefferson · Gonzalez Guevara, José Roly · Grandez Acosta, Michael Cristofer. Docente: Ing. Alex Tongo Silva.
+> **No es una herramienta oficial de la UCV ni está integrada a Trilce.**
+
+## Qué incluye
+
+| Sección | Descripción |
+| --- | --- |
+| **Registro e inicio de sesión** | Cualquier persona crea su cuenta (nombre, correo, contraseña, carrera, campus). Contraseñas guardadas con hash SHA-256 + sal, nunca en texto plano. |
+| **Catálogo** | Publicaciones reales de la comunidad en las 3 secciones del proyecto (Conocimientos, Materiales, Investigación). Cada publicación **ofrece** o **busca** (pedir apoyo también es posible). Filtros por carrera, curso, tema, tipo de recurso (resumen, apuntes, presentación, mapa conceptual…) y campus. Empieza vacío. |
+| **Cómo funciona** | Los 5 pasos del PDF: Ingresar → Buscar → Publicar → Contactar → Coordinar. |
+| **Vistas separadas** | Inicio, Catálogo, Biblioteca y Sedes son páginas distintas (#catalogo, #biblioteca, #sedes) con animaciones de entrada escalonadas. |
+| **Valoración de 5 estrellas** | En cada publicación (con reseñas y distribución) y en cada recurso de la biblioteca. |
+| **Biblioteca** | 23 recursos reales: catálogo, repositorio y MyLOFT de la UCV; ALICIA, RENATI, SciELO Perú; RNE e INACAL; APA, ORCID, CTI Vitae; y guías de estudio con fuentes oficiales. Editable en `src/data/library.ts`. |
+| **Sedes UCV** | Los 12 campus oficiales y los horarios de sus bibliotecas (fuente: ucv.edu.pe). Editable en `src/data/ucv.ts`. |
+| **Solicitudes** | El contacto (correo / celular) solo se muestra cuando se acepta la solicitud. |
+| **Panel de administración** | Usuarios, roles, moderación y reportes. Solo para cuentas con permisos. |
+| **Archivos adjuntos** | Al publicar se pueden subir hasta 3 archivos (PDF, imágenes, Word, PowerPoint, Excel, ZIP; 10 MB c/u). Si es **Gratis**, cualquier usuario registrado descarga; si es **Intercambio**, se desbloquea cuando el autor acepta la solicitud. Se guardan en IndexedDB del navegador. |
+| **Declaración de responsabilidad** | Antes de publicar, la persona acepta que es responsable de su contenido (autoría, citas, sin exámenes copiados, datos verídicos). |
+
+## Ejecutar en tu PC
+
+Requisito: [Node.js](https://nodejs.org/) 18 o superior.
 
 ```bash
-npm install --legacy-peer-deps
+npm install      # solo la primera vez (necesita internet)
+npm run dev      # abre http://localhost:3000
+npm test         # pruebas unitarias
+npm run build    # versión de producción en /dist
 ```
 
-1. Crea un proyecto en Supabase y habilita **Authentication → Providers → Email**.
-2. Copia `.env.example` a `.env.local` y define `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` con la URL del proyecto y su clave pública (publishable/anon).
-3. En **Authentication → URL Configuration**, añade `http://localhost:3000` y `https://slarkgodota.github.io/EXCHANGE-UCV/` como URLs de redirección permitidas.
-4. Nunca uses ni publiques la clave `service_role`.
-5. Para crear las tablas, abre **SQL Editor**, pega y ejecuta el contenido de [`supabase/migrations/20261103000000_initial_schema.sql`](./supabase/migrations/20261103000000_initial_schema.sql).
+En Windows también puedes hacer doble clic en `iniciar_en_windows.bat` (en Mac/Linux: `iniciar_en_mac_linux.sh`).
 
-## Desarrollo local
 
-```bash
-npm run dev
+## Cuentas de administrador
+
+| Cuenta | Correo | Contraseña inicial |
+| --- | --- | --- |
+| Administrador | `admin@exchangeucv.pe` | `AdminUCV2026` |
+| Michael Jefferson Delgado Cerdán (dueño) | `mdelgadoc@ucvvirtual.edu.pe` | `AdminExchange2026*` |
+| José Roly Gonzalez Guevara (dueño) | `jgonzalezg@ucvvirtual.edu.pe` | `AdminExchange2026*` |
+| Michael Cristofer Grandez Acosta (dueño) | `mgrandeza@ucvvirtual.edu.pe` | `AdminExchange2026*` |
+
+Desde el botón **Admin** se ve el registro completo de usuarios, se asignan roles (Estudiante, Profesor / Docente, Administrador, etc.), se crean roles nuevos, se moderan publicaciones y se atienden reportes.
+
+## Limitación importante (siguiente paso)
+
+Los datos se guardan en el **navegador de cada dispositivo** (`localStorage`). Es ideal para presentar el prototipo, pero dos personas en computadoras distintas no ven las mismas publicaciones. Para usarlo en serio entre estudiantes hace falta un backend con base de datos compartida y autenticación real (por ejemplo Supabase o Firebase).
+
+## Estructura
+
+```
+src/
+  data/ucv.ts          Datos reales de la UCV (campus, horarios, licencia, contacto)
+  data/library.ts      Recursos de la biblioteca
+  data/initialData.ts  Cuentas de los autores y roles (sin datos ficticios)
+  context/             Estado global (cuentas, publicaciones, solicitudes)
+  components/          Interfaz
+  utils/security.ts    Hash de contraseñas y validación de registro
+server.ts              Servidor Express + endpoint de auditoría con Gemini
 ```
 
-Supabase gestiona el registro, la confirmación de correo y el inicio/cierre de sesión. El resto de los datos de la aplicación continúa guardándose localmente en el navegador; todavía no se sincroniza entre usuarios o dispositivos.
+## Fuentes de la información institucional
 
-## GitHub Pages
-
-```bash
-npm run build:pages
-```
-
-El comando genera el sitio estático en `dist/`. GitHub Pages no ejecuta el servidor Express. Configura las dos variables de Supabase en el entorno antes de generar la versión que se publica. No subas `.env.local` ni datos personales.
+- Campus: https://www.ucv.edu.pe/en/campus-ucv
+- Bibliotecas y horarios: https://www.ucv.edu.pe/en/information-centers
+- Licenciamiento SUNEDU (Res. 077-2019-SUNEDU/CD): https://andina.pe/ingles/noticia-sunedu-otorga-licenciamiento-a-universidad-cesar-vallejo-norma-legal-y-graficos-755220.aspx

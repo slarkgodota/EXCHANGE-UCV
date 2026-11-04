@@ -32,7 +32,7 @@ if not exist node_modules (
 echo.
 echo [2/2] Iniciando plataforma local en el puerto 3000...
 echo.
-echo Se abrira la aplicacion con perfiles ficticios de demostracion.
+echo Cualquier persona puede crear su cuenta desde la pagina (boton Crear cuenta).
 echo.
 echo Abriendo tu navegador...
 timeout /t 2 >nul

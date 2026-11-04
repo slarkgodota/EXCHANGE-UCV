@@ -1,6 +1,0 @@
-{
-  "summary": "Plan de implementacion para conectar persistencia de datos con Firebase (Firestore y Auth) y anadir el modulo de evaluacion automatica de originalidad e integridad academica con IA (Gemini 3.8 Flash) en Exchange UCV.",
-  "updatedAt": "2026-11-02T17:08:52.256335918Z",
-  "requestFeedback": true,
-  "userFacing": true
-}

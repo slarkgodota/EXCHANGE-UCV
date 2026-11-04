@@ -1,7 +1,6 @@
 import React from 'react';
-import { X, BookOpen, GraduationCap, Award, CheckCircle } from 'lucide-react';
+import { X, BookOpen, GraduationCap, Award, ExternalLink, CheckCircle, FileText } from 'lucide-react';
 import { useExchange } from '../context/ExchangeContext';
-import { publicAsset } from '../utils/publicAsset';
 
 export const ProjectInfoModal: React.FC = () => {
   const { isProjectInfoModalOpen, setIsProjectInfoModalOpen } = useExchange();
@@ -16,7 +15,7 @@ export const ProjectInfoModal: React.FC = () => {
           <div className="flex items-center gap-3">
             <div className="bg-white p-1 rounded-lg">
               <img
-                src={publicAsset('assets/logo_ucv_alt.png')}
+                src="/assets/logo_ucv_alt.png"
                 alt="Escudo UCV"
                 className="h-7 w-auto object-contain"
               />
@@ -24,7 +23,7 @@ export const ProjectInfoModal: React.FC = () => {
             <div>
               <h3 className="font-bold text-base">Ficha del Proyecto: Exchange UCV</h3>
               <p className="text-[11px] text-red-200">
-                Prototipo académico • Colaboración universitaria
+                Grupo 5 • Escuela Profesional de Ingeniería Civil • UCV Moyobamba (2026)
               </p>
             </div>
           </div>
@@ -46,7 +45,7 @@ export const ProjectInfoModal: React.FC = () => {
               Universidad César Vallejo
             </span>
             <h4 className="text-sm font-bold text-slate-900">
-              Propuesta de intercambio académico
+              Facultad de Ingeniería Civil • Escuela Profesional de Ingeniería Civil
             </h4>
             <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 pt-1">
               <div>
@@ -60,23 +59,82 @@ export const ProjectInfoModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Demo information */}
+          {/* Authors List */}
           <div className="space-y-2">
             <h5 className="font-bold text-slate-900 uppercase tracking-wide text-[11px]">
-              Acerca de esta demostración:
+              Equipo de Autores e Investigadores:
             </h5>
-            <p className="rounded-xl border border-slate-200 bg-white p-3 text-[11px] leading-relaxed text-slate-600">
-              Esta versión pública muestra las funciones de la plataforma con
-              perfiles de ejemplo. No es un sistema oficial de autenticación ni
-              conecta con servicios universitarios. Los cambios se guardan
-              únicamente en el almacenamiento local de este navegador.
-            </p>
+            <div className="space-y-2">
+              <div className="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
+                <div>
+                  <strong className="text-slate-900 block">DELGADO CERDÁN, Michael Jefferson</strong>
+                  <span className="text-slate-500 text-[11px]">Estudiante de Ingeniería Civil</span>
+                </div>
+                <a
+                  href="https://orcid.org/0009-0004-9087-2490"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-emerald-700 font-semibold inline-flex items-center gap-1 hover:underline text-[11px]"
+                >
+                  orcid.org/0009-0004-9087-2490
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              <div className="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
+                <div>
+                  <strong className="text-slate-900 block">GONZALEZ GUEVARA, José Roly</strong>
+                  <span className="text-slate-500 text-[11px]">Estudiante de Ingeniería Civil</span>
+                </div>
+                <a
+                  href="https://orcid.org/0009-0008-6874-4045"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-emerald-700 font-semibold inline-flex items-center gap-1 hover:underline text-[11px]"
+                >
+                  orcid.org/0009-0008-6874-4045
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              <div className="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
+                <div>
+                  <strong className="text-slate-900 block">GRANDEZ ACOSTA, Michael Cristofer</strong>
+                  <span className="text-slate-500 text-[11px]">Estudiante de Ingeniería Civil</span>
+                </div>
+                <a
+                  href="https://orcid.org/0009-0004-9770-9557"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-emerald-700 font-semibold inline-flex items-center gap-1 hover:underline text-[11px]"
+                >
+                  orcid.org/0009-0004-9770-9557
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-center justify-between">
+                <div>
+                  <strong className="text-amber-950 block">Docente Asesor: Ing. Alex Tongo Silva</strong>
+                  <span className="text-amber-800 text-[11px]">Docente del curso</span>
+                </div>
+                <a
+                  href="https://orcid.org/0000-0001-5503-3692"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-emerald-800 font-semibold inline-flex items-center gap-1 hover:underline text-[11px]"
+                >
+                  orcid.org/0000-0001-5503-3692
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
           </div>
 
           {/* 3 Core Problems solved */}
           <div className="space-y-2">
             <h5 className="font-bold text-slate-900 uppercase tracking-wide text-[11px]">
-              Los 3 Problemas Identificados y Resueltos:
+              Los 3 problemas identificados
             </h5>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div className="p-3 bg-rose-50 rounded-xl border border-rose-100">
@@ -102,6 +160,28 @@ export const ProjectInfoModal: React.FC = () => {
             </div>
           </div>
 
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-[11px] leading-relaxed">
+            <strong>Aclaración del proyecto:</strong> Exchange UCV es un prototipo inicial elaborado por estudiantes. No está
+            integrado a Trilce ni es una herramienta oficial de la Universidad César Vallejo. El siguiente paso propuesto es
+            validar la idea con encuestas a estudiantes de distintas carreras.
+          </div>
+
+          {/* Original PDF download link */}
+          <div className="p-3 bg-slate-100 rounded-xl flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-slate-600" />
+              <span>Documento PDF Original: <strong>PROYECTO_EXCHANGE_UCV__GRUPO_5.pdf</strong></span>
+            </div>
+            <a
+              href="/docs/PROYECTO_EXCHANGE_UCV_GRUPO_5.pdf"
+              target="_blank"
+              rel="noreferrer"
+              className="text-red-700 font-bold hover:underline inline-flex items-center gap-1"
+            >
+              Ver PDF
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
         </div>
 
         {/* Footer */}

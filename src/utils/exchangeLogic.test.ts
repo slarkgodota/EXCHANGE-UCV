@@ -7,6 +7,7 @@ import {
   calculateAdminMetrics,
   validateAdminCreateUser,
   canModifyRole,
+  isSafeHttpUrl,
 } from './exchangeLogic';
 import { Publication, Review, StudentUser, FilterState } from '../types/exchange';
 
@@ -19,11 +20,12 @@ const mockAuthor: StudentUser = {
   campus: 'Moyobamba',
   cycle: 'Ciclo VIII',
   orcid: '0009-0004-9087-2490',
-  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
   verified: true,
-  ratingAverage: 5.0,
-  ratingCount: 12,
-  bio: 'Estudiante de Ing. Civil UCV Moyobamba apasionado por las estructuras.',
+  ratingAverage: 0,
+  ratingCount: 0,
+  bio: 'Prueba unitaria',
+  passwordHash: 'x',
+  passwordSalt: 'y',
 };
 
 const sampleReviews: Review[] = [
@@ -93,6 +95,9 @@ test('filterPublications filters by category and career', () => {
     career: 'Ingeniería Civil',
     searchQuery: '',
     campus: 'todos',
+    intent: 'todos',
+    resourceType: 'todos',
+    course: '',
     sortBy: 'relevance',
     minRating: 0,
   };
@@ -116,6 +121,9 @@ test('filterPublications filters by search term', () => {
     career: 'todas',
     searchQuery: 'Estructuras',
     campus: 'todos',
+    intent: 'todos',
+    resourceType: 'todos',
+    course: '',
     sortBy: 'relevance',
     minRating: 0,
   };
@@ -170,7 +178,8 @@ test('validateAdminCreateUser validates name, email format, unique email, and re
     email: 'mdelgadoc@ucvvirtual.edu.pe',
     role: 'student',
     career: 'Derecho',
-    campus: 'Lima Norte',
+    campus: 'Los Olivos',
+    password: 'Clave2026x',
     existingEmails,
   });
   assert.equal(duplicateErr, 'Este correo institucional ya se encuentra registrado en el padrón.');
@@ -181,10 +190,11 @@ test('validateAdminCreateUser validates name, email format, unique email, and re
     email: 'correo_sin_arroba',
     role: 'student',
     career: 'Derecho',
-    campus: 'Lima Norte',
+    campus: 'Los Olivos',
+    password: 'Clave2026x',
     existingEmails,
   });
-  assert.equal(invalidEmailErr, 'Por favor ingresa un correo electrónico institucional válido.');
+  assert.equal(invalidEmailErr, 'Por favor ingresa un correo electrónico válido.');
 
   // Test valid data
   const validUser = validateAdminCreateUser({
@@ -193,6 +203,7 @@ test('validateAdminCreateUser validates name, email format, unique email, and re
     role: 'docente',
     career: 'Medicina Humana',
     campus: 'Trujillo',
+    password: 'Clave2026x',
     existingEmails,
   });
   assert.equal(validUser, null);
@@ -214,3 +225,37 @@ test('canModifyRole prevents revoking Grupo 5 creators but allows modifying othe
   assert.equal(canModifyRole('docente_tutor@ucv.edu.pe', rootCreators), true);
 });
 
+
+test('validateAdminCreateUser exige contraseña inicial segura', () => {
+  const err = validateAdminCreateUser({
+    name: 'Ana Torres',
+    email: 'ana@ucvvirtual.edu.pe',
+    role: 'student',
+    career: 'Derecho',
+    campus: 'Piura',
+    password: 'corta',
+    existingEmails: [],
+  });
+  assert.match(err || '', /contraseña/);
+});
+
+test('calculateAdminMetrics no inventa satisfacción sin reseñas', () => {
+  const metrics = calculateAdminMetrics([], [mockAuthor], [], []);
+  assert.equal(metrics.averageSatisfaction, 0);
+});
+
+test('isSafeHttpUrl bloquea esquemas peligrosos', () => {
+  assert.equal(isSafeHttpUrl('https://drive.google.com/file/d/abc'), true);
+  assert.equal(isSafeHttpUrl('javascript:alert(1)'), false);
+  assert.equal(isSafeHttpUrl('no es url'), false);
+});
+
+test('filterPublications filtra por ofrece/busca, tipo de recurso y curso (sección 7 del PDF)', () => {
+  const base: FilterState = { category: 'todas', career: 'todas', searchQuery: '', campus: 'todos', intent: 'todos', resourceType: 'todos', course: '', sortBy: 'newest', minRating: 0 };
+  const busca = { ...samplePub, id: 'p2', intent: 'busco' as const, resourceType: 'Mapa conceptual' as const, course: 'Física II' };
+  const list = [{ ...samplePub, resourceType: 'Resumen' as const }, busca];
+  assert.equal(filterPublications(list, { ...base, intent: 'busco' }).length, 1);
+  assert.equal(filterPublications(list, { ...base, intent: 'ofrezco' })[0].id, samplePub.id);
+  assert.equal(filterPublications(list, { ...base, resourceType: 'Mapa conceptual' })[0].id, 'p2');
+  assert.equal(filterPublications(list, { ...base, course: 'fisica' })[0].id, 'p2');
+});

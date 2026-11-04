@@ -22,8 +22,10 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useExchange } from '../context/ExchangeContext';
-import { calculateRatingDistribution } from '../utils/exchangeLogic';
-import { publicAsset } from '../utils/publicAsset';
+import { calculateRatingDistribution, isSafeHttpUrl } from '../utils/exchangeLogic';
+import { Avatar } from './Avatar';
+import { AttachmentList } from './AttachmentList';
+import { getCampusLabel } from '../data/ucv';
 
 export const PublicationDetailModal: React.FC = () => {
   const {
@@ -33,14 +35,20 @@ export const PublicationDetailModal: React.FC = () => {
     addReview,
     reportPublication,
     currentUser,
-    runAIAuditOnPublication,
+    recordResourceOpen,
+    openAuth,
+    isLoggedIn,
+    isCreatorOrAdmin,
+    deletePublication,
+    canDownload,
   } = useExchange();
 
   const [ratingInput, setRatingInput] = useState<number>(5);
   const [commentInput, setCommentInput] = useState<string>('');
   const [isSubmittingReview, setIsSubmittingReview] = useState<boolean>(false);
   const [reviewSuccessMsg, setReviewSuccessMsg] = useState<string>('');
-  const [isAuditingLive, setIsAuditingLive] = useState<boolean>(false);
+  const [reviewError, setReviewError] = useState<string>('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
   
   // Plagiarism report toggle
   const [showReportForm, setShowReportForm] = useState<boolean>(false);
@@ -48,8 +56,6 @@ export const PublicationDetailModal: React.FC = () => {
   const [reportDetails, setReportDetails] = useState<string>('');
   const [reportSuccess, setReportSuccess] = useState<string>('');
 
-  // Download simulation
-  const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
 
   if (!selectedPublication) return null;
 
@@ -60,11 +66,20 @@ export const PublicationDetailModal: React.FC = () => {
     e.preventDefault();
     if (!commentInput.trim()) return;
 
+    if (!isLoggedIn) {
+      openAuth('login');
+      return;
+    }
     setIsSubmittingReview(true);
-    addReview(pub.id, ratingInput, commentInput.trim());
-    setCommentInput('');
+    setReviewError('');
+    const res = addReview(pub.id, ratingInput, commentInput.trim());
     setIsSubmittingReview(false);
-    setReviewSuccessMsg('¡Gracias por tu valoración! Tu opinión ayuda a la comunidad UCV.');
+    if (!res.ok) {
+      setReviewError(res.error || 'No se pudo publicar la reseña.');
+      return;
+    }
+    setCommentInput('');
+    setReviewSuccessMsg('¡Gracias por tu valoración! Tu opinión ayuda a la comunidad.');
     setTimeout(() => setReviewSuccessMsg(''), 4000);
   };
 
@@ -72,32 +87,36 @@ export const PublicationDetailModal: React.FC = () => {
     e.preventDefault();
     if (!reportDetails.trim()) return;
 
+    if (!isLoggedIn) {
+      openAuth('login');
+      return;
+    }
     reportPublication({
       publicationId: pub.id,
       publicationTitle: pub.title,
       reason: reportReason,
       details: reportDetails.trim(),
     });
-    setReportSuccess('Reporte guardado en esta demostración local.');
+    setReportSuccess('Reporte enviado a los moderadores de Exchange UCV.');
     setShowReportForm(false);
     setReportDetails('');
     setTimeout(() => setReportSuccess(''), 5000);
   };
 
-  const handleDownloadSim = () => {
-    setDownloadSuccess(true);
-    setTimeout(() => setDownloadSuccess(false), 3000);
+  const hasLink = Boolean(pub.resourceUrl && isSafeHttpUrl(pub.resourceUrl));
+  const isMine = currentUser?.id === pub.author.id;
+  const isFree = pub.exchangeType === 'Gratuito / RSU';
+
+  const linkAllowed = hasLink && canDownload(pub).allowed;
+
+  const handleContact = () => {
+    if (!isLoggedIn) {
+      openAuth('login');
+      return;
+    }
+    setIsContactModalOpen(true);
   };
 
-  const handleLiveAIAudit = async () => {
-    if (!pub) return;
-    setIsAuditingLive(true);
-    try {
-      await runAIAuditOnPublication(pub.id);
-    } finally {
-      setIsAuditingLive(false);
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-fadeIn">
@@ -106,12 +125,12 @@ export const PublicationDetailModal: React.FC = () => {
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
           <div className="flex items-center gap-2.5">
             <img
-              src={publicAsset('assets/logo_ucv_alt.png')}
+              src="/assets/logo_ucv_alt.png"
               alt="UCV"
               className="h-6 w-auto object-contain"
             />
             <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
-              Universidad César Vallejo • Ficha Académica Nacional
+              Exchange UCV · Publicación
             </span>
           </div>
 
@@ -239,7 +258,7 @@ export const PublicationDetailModal: React.FC = () => {
               <span>•</span>
               <span className="flex items-center gap-1">
                 <Download className="w-4 h-4 text-slate-400" />
-                Intercambios & descargas: <strong className="text-slate-800 ml-1">{pub.downloadCount}</strong>
+                Veces abierto: <strong className="text-slate-800 ml-1">{pub.downloadCount}</strong>
               </span>
             </div>
 
@@ -251,54 +270,89 @@ export const PublicationDetailModal: React.FC = () => {
               <p className="whitespace-pre-line">{pub.description}</p>
             </div>
 
-            {/* Action Bar (Download + Contact student) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-              <button
-                type="button"
-                onClick={handleDownloadSim}
-                className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm shadow-md transition-all"
-              >
-                <Download className="w-4 h-4 text-red-400" />
-                {downloadSuccess
-                  ? '¡Descargado con éxito!'
-                  : `Descargar Recurso (${pub.fileType || 'PDF'} • ${pub.fileSize || 'Digital'})`}
-              </button>
+            <AttachmentList pub={pub} onNeedRequest={handleContact} />
 
-              <button
-                type="button"
-                onClick={() => setIsContactModalOpen(true)}
-                className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-semibold text-sm shadow-lg shadow-red-600/30 transition-all"
-              >
-                <Send className="w-4 h-4" />
-                Solicitar Intercambio / Contactar a {pub.author.name.split(' ')[0]}
-              </button>
+            {/* Acciones */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              {hasLink ? (
+                linkAllowed ? (
+                  <a
+                    href={pub.resourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => recordResourceOpen(pub.id)}
+                    className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm shadow-md transition-all"
+                  >
+                    <ExternalLink className="w-4 h-4 text-red-400" /> Abrir enlace del recurso
+                  </a>
+                ) : (
+                  <div className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-slate-100 text-slate-500 font-semibold text-sm">
+                    <Lock className="w-4 h-4" /> Enlace disponible tras el intercambio
+                  </div>
+                )
+              ) : (
+                <div className="hidden sm:block" />
+              )}
+
+              {isMine ? (
+                <div className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 font-semibold text-sm">
+                  Esta es tu publicación
+                </div>
+              ) : isFree ? (
+                <div className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-semibold text-sm">
+                  <CheckCircle2 className="w-4 h-4" />
+                  {!(pub.attachments?.length || hasLink) ? 'Publicación gratuita' : isLoggedIn ? 'Publicación gratuita: descarga libre' : 'Gratis: inicia sesión para descargar'}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleContact}
+                  className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-semibold text-sm shadow-lg shadow-red-600/30 transition-all"
+                >
+                  <Send className="w-4 h-4" />
+                  {isLoggedIn ? `Solicitar intercambio a ${pub.author.name.split(' ')[0]}` : 'Inicia sesión para contactar'}
+                </button>
+              )}
             </div>
+            {(isMine || isCreatorOrAdmin) && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirmDelete) deletePublication(pub.id);
+                    else {
+                      setConfirmDelete(true);
+                      setTimeout(() => setConfirmDelete(false), 4000);
+                    }
+                  }}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg ${confirmDelete ? 'bg-red-600 text-white' : 'text-red-600 hover:bg-red-50'}`}
+                >
+                  {confirmDelete ? 'Toca de nuevo para eliminar' : 'Eliminar publicación'}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Author Card & Credential Info */}
           <div className="pt-6 space-y-3">
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">
-              Datos del Publicador (Comunidad UCV)
+              Publicado por
             </h3>
 
             <div className="bg-gradient-to-br from-slate-50 to-slate-100/60 p-5 rounded-2xl border border-slate-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <img
-                  src={pub.author.avatar}
-                  alt={pub.author.name}
-                  className="w-14 h-14 rounded-2xl object-cover border-2 border-white shadow-md"
-                />
+                <Avatar name={pub.author.name} src={pub.author.avatar} size="lg" />
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <h4 className="font-bold text-slate-900 text-base">{pub.author.name}</h4>
                     {pub.author.verified && (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full">
-                        <BadgeCheck className="w-3.5 h-3.5" /> Verificado UCV
+                        <BadgeCheck className="w-3.5 h-3.5" /> Cuenta verificada
                       </span>
                     )}
                   </div>
                   <p className="text-xs text-slate-600">
-                    {pub.author.career} • Sede {pub.author.campus} ({pub.author.cycle})
+                    {pub.author.career} • {getCampusLabel(pub.author.campus)}{pub.author.cycle ? ` (${pub.author.cycle})` : ''}
                   </p>
                   <p className="text-xs text-slate-500 italic max-w-lg">{pub.author.bio}</p>
                 </div>
@@ -319,140 +373,13 @@ export const PublicationDetailModal: React.FC = () => {
             </div>
           </div>
 
-          {/* AI ORIGINALITY & ACADEMIC INTEGRITY AUDIT (GEMINI 3.8 FLASH) */}
-          <div className="pt-6 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <Brain className="w-5 h-5 text-red-600" />
-                  <h3 className="text-base font-bold text-slate-900">
-                    Auditoría de Originalidad e Integridad Académica (Gemini 3.8 Flash)
-                  </h3>
-                </div>
-                <p className="text-xs text-slate-500">
-                  Evaluación inteligente de aporte pedagógico y prevención de plagio conforme al Art. 10 de Exchange UCV.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleLiveAIAudit}
-                disabled={isAuditingLive}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer shrink-0"
-              >
-                {isAuditingLive ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-red-400" />
-                    <span>Auditando...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>{pub.aiAudit ? 'Re-auditar con IA' : 'Auditar con IA Ahora'}</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {pub.aiAudit ? (
-              <div className="bg-gradient-to-br from-slate-900 via-[#131b34] to-[#250d15] text-white p-5 rounded-2xl border border-slate-800 shadow-md space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-black text-emerald-400 font-display">
-                      {pub.aiAudit.originalityScore}%
-                    </span>
-                    <div>
-                      <span className="text-xs font-bold text-slate-200 block">
-                        Originalidad & Aporte Formativo
-                      </span>
-                      <span className="text-[10px] text-slate-400">
-                        {pub.aiAudit.analyzedAt ? `Auditado el ${pub.aiAudit.analyzedAt}` : 'Certificado oficial UCV'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <span
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                      pub.aiAudit.verdict === 'APROBADO_INTEGRO'
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                        : pub.aiAudit.verdict === 'REQUIERE_CITACION'
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        : 'bg-red-500/20 text-red-300 border border-red-500/30'
-                    }`}
-                  >
-                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                    {pub.aiAudit.verdict === 'APROBADO_INTEGRO'
-                      ? 'Aprobado Íntegro'
-                      : pub.aiAudit.verdict === 'REQUIERE_CITACION'
-                      ? 'Requiere Citas Adicionales'
-                      : 'Revisión por Similitud'}
-                  </span>
-                </div>
-
-                {/* Gauge bar */}
-                <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-300 rounded-full transition-all duration-700"
-                    style={{ width: `${Math.min(100, Math.max(5, pub.aiAudit.originalityScore))}%` }}
-                  />
-                </div>
-
-                <p className="text-xs text-slate-200 leading-relaxed">
-                  {pub.aiAudit.summary}
-                </p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
-                  <div className="p-3 bg-slate-900/90 rounded-xl border border-slate-800 space-y-1">
-                    <span className="font-bold text-emerald-400 block text-xs">Fortalezas del Material:</span>
-                    <ul className="list-disc list-inside text-slate-300 text-[11px] space-y-1">
-                      {pub.aiAudit.strengths.map((str, idx) => (
-                        <li key={idx}>{str}</li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="p-3 bg-slate-900/90 rounded-xl border border-slate-800 space-y-1">
-                    <span className="font-bold text-amber-300 block text-xs">Recomendaciones Éticas:</span>
-                    <ul className="list-disc list-inside text-slate-300 text-[11px] space-y-1">
-                      {pub.aiAudit.suggestions.map((sug, idx) => (
-                        <li key={idx}>{sug}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-                  <span className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    {pub.aiAudit.academicIntegrityNote}
-                  </span>
-                  <span className="font-mono text-[10px] text-slate-400">Auditoría IA UCV Grupo 5</span>
-                </div>
-              </div>
-            ) : (
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-xs text-slate-600">
-                <span className="flex items-center gap-2">
-                  <Brain className="w-4 h-4 text-slate-400" />
-                  Este material aún no ha sido auditado con el modelo de IA.
-                </span>
-                <button
-                  type="button"
-                  onClick={handleLiveAIAudit}
-                  className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
-                >
-                  Ejecutar Auditoría Ahora
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* 5-STAR RATING & REVIEWS TABLE (Requested by User) */}
+          {/* Reseñas */}
           <div className="pt-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                   <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
-                  Tabla de Valoración de 5 Estrellas
+                  Valoración de 5 estrellas
                 </h3>
                 <p className="text-xs text-slate-500">
                   Opiniones y calificaciones reales de estudiantes que accedieron a este material o asesoría.
@@ -484,7 +411,7 @@ export const PublicationDetailModal: React.FC = () => {
                   ))}
                 </div>
                 <p className="text-xs text-slate-500 font-medium">
-                  Promedio de {ratingData.total} valoraciones verificadas
+                  Promedio de {ratingData.total} valoraciones
                 </p>
               </div>
 
@@ -523,9 +450,12 @@ export const PublicationDetailModal: React.FC = () => {
             >
               <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-red-600" />
-                Dejar tu opinión y valorar este recurso como {currentUser?.name || 'Estudiante UCV'}
+                {isLoggedIn ? `Valorar este recurso como ${currentUser?.name}` : 'Inicia sesión para valorar este recurso'}
               </h4>
 
+              {reviewError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs">{reviewError}</div>
+              )}
               {reviewSuccessMsg && (
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -571,14 +501,14 @@ export const PublicationDetailModal: React.FC = () => {
 
               <div className="flex justify-between items-center pt-1">
                 <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                  <Lock className="w-3 h-3" /> Tu valoración se publicará con tu cuenta estudiantil UCV.
+                  <Lock className="w-3 h-3" /> Tu reseña se publica con tu nombre.
                 </span>
                 <button
                   type="submit"
                   disabled={isSubmittingReview}
                   className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow transition-colors"
                 >
-                  Publicar Valoración 5★
+                  Publicar reseña
                 </button>
               </div>
             </form>
@@ -619,7 +549,7 @@ export const PublicationDetailModal: React.FC = () => {
                             </span>
                             {rev.verifiedExchange && (
                               <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-medium border border-emerald-200">
-                                Intercambio Verificado
+                                Tras un intercambio
                               </span>
                             )}
                           </div>
@@ -653,7 +583,7 @@ export const PublicationDetailModal: React.FC = () => {
 
         {/* Footer info */}
         <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span>ID de recurso: {pub.id}</span>
+          <span />
           <button
             type="button"
             onClick={() => setSelectedPublication(null)}

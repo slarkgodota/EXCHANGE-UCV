@@ -4,15 +4,8 @@ import path from 'path';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig(({ mode }) => {
-  const isPagesBuild = mode === 'pages';
-
+export default defineConfig(() => {
   return {
-    base: isPagesBuild ? '/EXCHANGE-UCV/' : '/',
-    publicDir: isPagesBuild ? 'public-pages' : 'public',
-    build: {
-      cssMinify: !isPagesBuild,
-    },
     plugins: [
       react(),
       tailwindcss(),
@@ -25,31 +18,31 @@ export default defineConfig(({ mode }) => {
           'assets/ucv-oficial.svg',
         ],
         manifest: {
-          id: './',
-          name: 'Exchange UCV - Plataforma Académica Colaborativa',
+          id: '/',
+          name: 'Exchange UCV - Plataforma académica colaborativa',
           short_name: 'ExchangeUCV',
           description:
-            'Plataforma digital universitaria para compartir conocimientos y materiales de estudio de la Universidad César Vallejo.',
+            'Plataforma estudiantil para compartir conocimientos y materiales de estudio entre estudiantes de la UCV.',
           theme_color: '#dc2626',
           background_color: '#0f172a',
           display: 'standalone',
-          start_url: './',
-          scope: './',
+          start_url: '/',
+          scope: '/',
           icons: [
             {
-              src: 'assets/logo_ucv_alt.png',
+              src: '/assets/logo_ucv_alt.png',
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: 'assets/logo_ucv_alt.png',
+              src: '/assets/logo_ucv_alt.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: 'assets/logo_ucv_alt.png',
+              src: '/assets/logo_ucv_alt.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable',
@@ -86,21 +79,7 @@ export default defineConfig(({ mode }) => {
                   statuses: [0, 200],
                 },
               },
-            },
-            {
-              urlPattern: /^https:\/\/images\.unsplash\.com\/.*/i,
-              handler: 'CacheFirst',
-              options: {
-                cacheName: 'unsplash-images-cache',
-                expiration: {
-                  maxEntries: 30,
-                  maxAgeSeconds: 60 * 60 * 24 * 30,
-                },
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
-              },
-            },
+            }
           ],
         },
         devOptions: {

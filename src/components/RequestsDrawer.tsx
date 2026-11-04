@@ -13,6 +13,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { useExchange } from '../context/ExchangeContext';
+import { getCampusLabel } from '../data/ucv';
 
 export const RequestsDrawer: React.FC = () => {
   const {
@@ -21,7 +22,15 @@ export const RequestsDrawer: React.FC = () => {
     requests,
     currentUser,
     updateRequestStatus,
+    users,
   } = useExchange();
+
+  // Datos de contacto de la otra persona (solo se muestran cuando la solicitud fue aceptada)
+  const counterpartContact = (req: { senderEmail: string; senderPhone: string; receiverId: string }) => {
+    if (activeTab === 'recibidas') return { email: req.senderEmail, phone: req.senderPhone };
+    const receiver = users.find((u) => u.id === req.receiverId);
+    return { email: receiver?.email || '—', phone: receiver?.phone || '' };
+  };
 
   const [activeTab, setActiveTab] = useState<'recibidas' | 'enviadas'>('recibidas');
 
@@ -155,7 +164,7 @@ export const RequestsDrawer: React.FC = () => {
                       {activeTab === 'recibidas' ? req.senderName : req.receiverName}
                     </span>
                     <span className="text-[10px] text-slate-500">
-                      Sede {req.senderCampus}
+                      {getCampusLabel(req.senderCampus)}
                     </span>
                   </div>
 
@@ -171,7 +180,7 @@ export const RequestsDrawer: React.FC = () => {
                 </div>
 
                 {/* Contact info if accepted */}
-                {req.status === 'aceptada' && (
+                {(req.status === 'aceptada' || req.status === 'completada') && (
                   <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 space-y-1">
                     <div className="font-bold flex items-center gap-1 text-[11px]">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
@@ -179,11 +188,11 @@ export const RequestsDrawer: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2 text-[11px]">
                       <Mail className="w-3 h-3" />
-                      <span>{req.senderEmail}</span>
+                      <span>{counterpartContact(req).email}</span>
                     </div>
                     <div className="flex items-center gap-2 text-[11px]">
                       <Phone className="w-3 h-3" />
-                      <span>{req.senderPhone}</span>
+                      <span>{counterpartContact(req).phone || 'Sin celular registrado'}</span>
                     </div>
                   </div>
                 )}

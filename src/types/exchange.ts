@@ -1,31 +1,13 @@
 export type CategoryType = 'conocimientos' | 'materiales' | 'investigacion';
 
-export type CareerType =
-  | 'Ingeniería Civil'
-  | 'Ingeniería de Sistemas'
-  | 'Medicina Humana'
-  | 'Derecho'
-  | 'Psicología'
-  | 'Administración'
-  | 'Arquitectura'
-  | 'Contabilidad'
-  | 'Ciencias de la Comunicación'
-  | 'General / Interdisciplinario';
+import { CAREERS, CampusId } from '../data/ucv';
+import { PublicationIntent, ResourceType } from '../data/catalog';
 
-export type CampusType =
-  | 'Lima Norte'
-  | 'Lima Este'
-  | 'Lima Ate'
-  | 'Callao'
-  | 'Trujillo'
-  | 'Piura'
-  | 'Chiclayo'
-  | 'Tarapoto'
-  | 'Moyobamba'
-  | 'Chimbote'
-  | 'Huaraz'
-  | 'Chepén'
-  | 'Arequipa';
+export type { PublicationIntent, ResourceType };
+
+export type CareerType = (typeof CAREERS)[number];
+
+export type CampusType = CampusId;
 
 export interface RolePermission {
   canPublish: boolean;
@@ -56,13 +38,24 @@ export interface StudentUser {
   campus: CampusType;
   cycle: string;
   orcid?: string;
-  avatar: string;
+  /** URL de foto opcional. Si falta se muestran las iniciales. */
+  avatar?: string;
+  /** true solo para cuentas confirmadas por un administrador */
   verified: boolean;
   ratingAverage: number;
   ratingCount: number;
   bio: string;
   phone?: string;
+  /** SHA-256(salt + contraseña). Nunca se guarda la contraseña en texto plano. */
+  passwordHash: string;
+  passwordSalt: string;
+  createdAt?: string;
 }
+
+/** Datos públicos del autor que se copian en cada publicación (sin credenciales). */
+export type PublicAuthor = Omit<StudentUser, 'passwordHash' | 'passwordSalt' | 'phone' | 'email'> & {
+  email?: string;
+};
 
 export interface Review {
   id: string;
@@ -84,12 +77,20 @@ export interface Publication {
   category: CategoryType;
   career: CareerType;
   course: string;
-  author: StudentUser;
+  author: PublicAuthor;
   cycleLevel: string; // e.g. "Ciclo IV", "Ciclo VII", "Todos"
   tags: string[];
   exchangeType: 'Intercambio Académico' | 'Gratuito / RSU' | 'Colaboración en Equipo';
   fileType?: 'PDF' | 'DOCX' | 'ZIP' | 'XLSX' | 'Sesión Google Meet';
   fileSize?: string;
+  /** ofrezco = ofrece ayuda / comparte; busco = solicita apoyo o material. Por defecto 'ofrezco'. */
+  intent?: PublicationIntent;
+  /** Tipo de recurso: resumen, apuntes, presentación, mapa conceptual… */
+  resourceType?: ResourceType;
+  /** Archivos adjuntos (guardados en IndexedDB con este id). */
+  attachments?: AttachmentMeta[];
+  /** Enlace al recurso (Google Drive, OneDrive, etc.). Opcional. */
+  resourceUrl?: string;
   downloadCount: number;
   createdAt: string;
   status: 'aprobado' | 'en_revision' | 'destacado' | 'reportado';
@@ -146,6 +147,9 @@ export interface FilterState {
   career: 'todas' | CareerType;
   searchQuery: string;
   campus: 'todos' | CampusType;
+  intent: 'todos' | PublicationIntent;
+  resourceType: 'todos' | ResourceType;
+  course: string;
   sortBy: 'relevance' | 'rating' | 'newest' | 'downloads';
   minRating: number;
 }
@@ -159,4 +163,11 @@ export interface AdminMetrics {
   materialsCount: number;
   knowledgeCount: number;
   researchCount: number;
+}
+
+export interface AttachmentMeta {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
 }

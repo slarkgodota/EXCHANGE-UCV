@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Send, User, MessageSquare, ArrowLeftRight, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { useExchange } from '../context/ExchangeContext';
+import { getCampusLabel } from '../data/ucv';
 
 export const ContactExchangeModal: React.FC = () => {
   const {
@@ -15,6 +16,7 @@ export const ContactExchangeModal: React.FC = () => {
   const [message, setMessage] = useState('');
   const [proposedExchange, setProposedExchange] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!isContactModalOpen || !selectedPublication) return null;
 
@@ -24,15 +26,20 @@ export const ContactExchangeModal: React.FC = () => {
     e.preventDefault();
     if (!message.trim()) return;
 
-    sendContactRequest({
+    setError(null);
+    const res = sendContactRequest({
       publicationId: pub.id,
       publicationTitle: pub.title,
       publicationCategory: pub.category,
       receiverId: pub.author.id,
       receiverName: pub.author.name,
       message: message.trim(),
-      proposedExchange: proposedExchange.trim() || 'Apoyo recíproco académico / Colaboración UCV',
+      proposedExchange: proposedExchange.trim() || 'Sin propuesta específica',
     });
+    if (!res.ok) {
+      setError(res.error || 'No se pudo enviar la solicitud.');
+      return;
+    }
 
     setIsSuccess(true);
     setTimeout(() => {
@@ -73,11 +80,14 @@ export const ContactExchangeModal: React.FC = () => {
             </div>
             <h4 className="font-bold text-lg text-slate-900">¡Solicitud Enviada con Éxito!</h4>
             <p className="text-xs text-slate-600 max-w-xs mx-auto leading-relaxed">
-              Hemos notificado a <strong>{pub.author.name}</strong>. Podrás ver la respuesta en tu bandeja de solicitudes.
+              La solicitud quedó registrada para <strong>{pub.author.name}</strong>. Verás su respuesta en tu bandeja de solicitudes.
             </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
+            {error && (
+              <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-800">{error}</div>
+            )}
             {/* Target Publication summary card */}
             <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-1">
               <span className="text-[10px] uppercase font-bold text-slate-400">Recurso seleccionado:</span>
@@ -85,7 +95,7 @@ export const ContactExchangeModal: React.FC = () => {
               <div className="flex items-center gap-2 text-[11px] text-slate-600">
                 <span>Destinatario: <strong>{pub.author.name}</strong></span>
                 <span>•</span>
-                <span>Sede {pub.author.campus}</span>
+                <span>{getCampusLabel(pub.author.campus)}</span>
               </div>
             </div>
 

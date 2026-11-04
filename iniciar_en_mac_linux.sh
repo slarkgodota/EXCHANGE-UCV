@@ -18,7 +18,7 @@ fi
 echo ""
 echo "[2/2] Iniciando servidor local en http://localhost:3000..."
 echo ""
-echo "La aplicacion usa perfiles ficticios de demostracion."
+echo "Cualquier persona puede crear su cuenta desde la pagina (boton Crear cuenta)."
 echo ""
 
 # Abrir navegador según SO

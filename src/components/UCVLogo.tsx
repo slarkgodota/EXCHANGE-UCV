@@ -1,5 +1,4 @@
 import React from 'react';
-import { publicAsset } from '../utils/publicAsset';
 
 interface UCVLogoProps {
   className?: string;
@@ -29,7 +28,7 @@ export const UCVLogo: React.FC<UCVLogoProps> = ({
   // Official high-resolution transparent UCV Isotype and Full Logo
   const isotypeImg = (
     <img
-      src={publicAsset('assets/logo_ucv_alt.png')}
+      src="/assets/logo_ucv_alt.png"
       alt="Escudo Oficial Universidad César Vallejo"
       className={`${getSizeHeight()} w-auto object-contain shrink-0 ${className}`}
       loading="eager"
@@ -38,7 +37,7 @@ export const UCVLogo: React.FC<UCVLogoProps> = ({
 
   const fullLogoImg = (
     <img
-      src={publicAsset('assets/logo_ucv_oficial.png')}
+      src="/assets/logo_ucv_oficial.png"
       alt="Logotipo Oficial Universidad César Vallejo"
       className={`${getSizeHeight()} w-auto object-contain shrink-0 ${className}`}
       loading="eager"

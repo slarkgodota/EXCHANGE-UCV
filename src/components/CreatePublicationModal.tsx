@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import {
   X,
+  Upload,
+  FileText,
   Sparkles,
   AlertCircle,
   CheckCircle2,
@@ -11,21 +13,25 @@ import {
   Info,
 } from 'lucide-react';
 import { useExchange } from '../context/ExchangeContext';
-import { CategoryType, CareerType, AIOriginalityAuditResult } from '../types/exchange';
-import { validateNewPublication } from '../utils/exchangeLogic';
-import { publicAsset } from '../utils/publicAsset';
+import { CategoryType, CareerType } from '../types/exchange';
+import { validateNewPublication, isSafeHttpUrl } from '../utils/exchangeLogic';
+import { CAREERS } from '../data/ucv';
+import { ACCEPT_ATTR, MAX_FILES, MAX_FILE_MB, validateFile, formatBytes } from '../utils/fileStore';
+import { INTENT_LABELS, RESOURCE_TYPES, DEFAULT_RESOURCE_TYPE, PublicationIntent, ResourceType } from '../data/catalog';
 
-const CAREERS: CareerType[] = [
-  'Ingeniería Civil',
-  'Ingeniería de Sistemas',
-  'Medicina Humana',
-  'Derecho',
-  'Psicología',
-  'Administración',
-  'Arquitectura',
-  'Contabilidad',
-  'Ciencias de la Comunicación',
-  'General / Interdisciplinario',
+
+const ACCESS_OPTIONS = [
+  { value: 'Gratuito / RSU', label: 'Gratis', hint: 'Cualquier usuario registrado puede descargar.' },
+  { value: 'Intercambio Académico', label: 'Intercambio', hint: 'Se descarga cuando aceptas su solicitud.' },
+  { value: 'Colaboración en Equipo', label: 'Equipo', hint: 'Solo para quienes aceptes en tu equipo.' },
+] as const;
+
+const RESPONSIBILITY_POINTS = [
+  'El contenido es de mi autoría o tengo permiso para compartirlo, y cito las fuentes que uso.',
+  'No comparto exámenes, evaluaciones o trabajos de otras personas para que sean copiados o presentados como propios.',
+  'La información que publico es verídica y no ofende ni discrimina a nadie.',
+  'No incluyo datos personales de terceros sin su autorización.',
+  'Si ofrezco o pido ayuda, cumpliré lo que acuerde con la otra persona y respetaré las normas académicas de la universidad.',
 ];
 
 export const CreatePublicationModal: React.FC = () => {
@@ -34,7 +40,6 @@ export const CreatePublicationModal: React.FC = () => {
     setIsCreateModalOpen,
     addPublication,
     currentUser,
-    auditPublicationWithAI,
   } = useExchange();
 
   const [title, setTitle] = useState('');
@@ -46,46 +51,33 @@ export const CreatePublicationModal: React.FC = () => {
   const [tagsInput, setTagsInput] = useState('');
   const [fileType, setFileType] = useState<'PDF' | 'DOCX' | 'ZIP' | 'XLSX' | 'Sesión Google Meet'>('PDF');
   const [exchangeType, setExchangeType] = useState<'Intercambio Académico' | 'Gratuito / RSU' | 'Colaboración en Equipo'>('Intercambio Académico');
+  const [resourceUrl, setResourceUrl] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [intent, setIntent] = useState<PublicationIntent>('ofrezco');
+  const [resourceType, setResourceType] = useState<ResourceType>('Resumen');
   const [academicIntegrityChecked, setAcademicIntegrityChecked] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // AI Originality Audit State
-  const [isAuditing, setIsAuditing] = useState(false);
-  const [auditResult, setAuditResult] = useState<AIOriginalityAuditResult | null>(null);
-  const [auditError, setAuditError] = useState<string | null>(null);
-
   if (!isCreateModalOpen) return null;
 
-  const handleRunAIAudit = async () => {
-    if (!title.trim() || !description.trim()) {
-      setErrorMsg('Por favor ingresa al menos el título y la descripción para que la IA evalúe la originalidad.');
-      return;
-    }
-    setErrorMsg(null);
-    setAuditError(null);
-    setIsAuditing(true);
-    try {
-      const res = await auditPublicationWithAI({
-        title: title.trim(),
-        course: course.trim() || 'Curso General',
-        career,
-        description: description.trim(),
-        category,
-        exchangeType,
-      });
-      setAuditResult(res);
-      // Auto-check the integrity declaration if the result is approved
-      if (res.verdict === 'APROBADO_INTEGRO') {
-        setAcademicIntegrityChecked(true);
+  const addFiles = (list: FileList | null) => {
+    if (!list) return;
+    const incoming = Array.from(list);
+    for (const f of incoming) {
+      const err = validateFile(f);
+      if (err) {
+        setErrorMsg(err);
+        return;
       }
-    } catch (e: any) {
-      setAuditError('No se pudo completar la auditoría con IA. Podrás publicar y auditarlo más tarde.');
-    } finally {
-      setIsAuditing(false);
     }
+    const merged = [...files, ...incoming].slice(0, MAX_FILES);
+    if (files.length + incoming.length > MAX_FILES) setErrorMsg(`Puedes adjuntar hasta ${MAX_FILES} archivos.`);
+    else setErrorMsg(null);
+    setFiles(merged);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
@@ -102,13 +94,19 @@ export const CreatePublicationModal: React.FC = () => {
       setErrorMsg(validationError);
       return;
     }
+    if (resourceUrl.trim() && !isSafeHttpUrl(resourceUrl.trim())) {
+      setErrorMsg('El enlace debe empezar con https:// (por ejemplo, un enlace de Google Drive u OneDrive).');
+      return;
+    }
 
     const tags = tagsInput
       .split(',')
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
 
-    addPublication({
+    setIsSaving(true);
+    const created = await addPublication({
+      files,
       title: title.trim(),
       description: description.trim(),
       category,
@@ -118,16 +116,24 @@ export const CreatePublicationModal: React.FC = () => {
       tags: tags.length > 0 ? tags : [course.trim()],
       exchangeType,
       fileType,
-      fileSize: fileType === 'Sesión Google Meet' ? 'Online' : '4.2 MB',
-      aiAudit: auditResult || undefined,
+      resourceUrl: resourceUrl.trim() || undefined,
+      intent,
+      resourceType,
     });
+    setIsSaving(false);
+    if (!created) {
+      setErrorMsg('No se pudo publicar. Inicia sesión e inténtalo de nuevo.');
+      return;
+    }
 
     // Reset and close
+    setFiles([]);
     setTitle('');
     setDescription('');
     setCourse('');
     setTagsInput('');
-    setAuditResult(null);
+    setResourceUrl('');
+    setIntent('ofrezco');
     setAcademicIntegrityChecked(false);
     setIsCreateModalOpen(false);
   };
@@ -140,7 +146,7 @@ export const CreatePublicationModal: React.FC = () => {
           <div className="flex items-center gap-3">
             <div className="bg-white p-1 rounded-lg">
               <img
-                src={publicAsset('assets/logo_ucv_alt.png')}
+                src="/assets/logo_ucv_alt.png"
                 alt="UCV"
                 className="h-6 w-auto object-contain"
               />
@@ -179,7 +185,7 @@ export const CreatePublicationModal: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
               <button
                 type="button"
-                onClick={() => setCategory('materiales')}
+                onClick={() => { setCategory('materiales'); setResourceType(DEFAULT_RESOURCE_TYPE.materiales); }}
                 className={`p-3 rounded-xl border font-bold text-center transition-all ${
                   category === 'materiales'
                     ? 'bg-red-50 border-red-500 text-red-700 ring-2 ring-red-500/20'
@@ -192,7 +198,7 @@ export const CreatePublicationModal: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => setCategory('conocimientos')}
+                onClick={() => { setCategory('conocimientos'); setResourceType(DEFAULT_RESOURCE_TYPE.conocimientos); }}
                 className={`p-3 rounded-xl border font-bold text-center transition-all ${
                   category === 'conocimientos'
                     ? 'bg-blue-50 border-blue-500 text-blue-700 ring-2 ring-blue-500/20'
@@ -205,7 +211,7 @@ export const CreatePublicationModal: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => setCategory('investigacion')}
+                onClick={() => { setCategory('investigacion'); setResourceType(DEFAULT_RESOURCE_TYPE.investigacion); }}
                 className={`p-3 rounded-xl border font-bold text-center transition-all ${
                   category === 'investigacion'
                     ? 'bg-emerald-50 border-emerald-500 text-emerald-700 ring-2 ring-emerald-500/20'
@@ -216,6 +222,46 @@ export const CreatePublicationModal: React.FC = () => {
                 <p className="text-[10px] font-normal text-slate-500 mt-0.5">Semilleros, tesis, proyectos</p>
               </button>
             </div>
+          </div>
+
+          {/* Ofrezco / Busco (sección 8 del proyecto) */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+              2. ¿Qué quieres hacer?
+            </label>
+            <div className="grid grid-cols-2 gap-2 text-xs" role="radiogroup">
+              {(['ofrezco', 'busco'] as PublicationIntent[]).map((i) => (
+                <button
+                  key={i}
+                  type="button"
+                  role="radio"
+                  aria-checked={intent === i}
+                  onClick={() => setIntent(i)}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    intent === i ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="block font-bold">{INTENT_LABELS[category][i].label}</span>
+                  <span className={`block text-[11px] mt-0.5 ${intent === i ? 'text-slate-300' : 'text-slate-500'}`}>
+                    {INTENT_LABELS[category][i].hint}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="pub-rtype" className="block text-xs font-semibold text-slate-700 mb-1">
+              Tipo de recurso:
+            </label>
+            <select
+              id="pub-rtype"
+              value={resourceType}
+              onChange={(e) => setResourceType(e.target.value as ResourceType)}
+              className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-white"
+            >
+              {RESOURCE_TYPES.map((t) => <option key={t}>{t}</option>)}
+            </select>
           </div>
 
           {/* Title */}
@@ -304,20 +350,77 @@ export const CreatePublicationModal: React.FC = () => {
               </select>
             </div>
 
+          </div>
+
+          {/* Archivos adjuntos */}
+          <div className="space-y-3">
+            <span className="block text-xs font-bold uppercase tracking-wider text-slate-700">Archivos adjuntos</span>
+            <label
+              htmlFor="pub-files"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                addFiles(e.dataTransfer.files);
+              }}
+              className="flex flex-col items-center justify-center gap-1 p-6 rounded-2xl border-2 border-dashed border-slate-300 hover:border-red-400 hover:bg-red-50/40 text-center cursor-pointer transition"
+            >
+              <Upload className="w-6 h-6 text-red-500" />
+              <span className="text-sm font-semibold text-slate-800">Arrastra tus archivos o haz clic para elegir</span>
+              <span className="text-[11px] text-slate-500">PDF, imágenes, Word, PowerPoint, Excel, ZIP · hasta {MAX_FILES} archivos de {MAX_FILE_MB} MB</span>
+              <input id="pub-files" type="file" multiple accept={ACCEPT_ATTR} className="sr-only" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
+            </label>
+            {files.length > 0 && (
+              <ul className="space-y-1.5">
+                {files.map((f, i) => (
+                  <li key={f.name + i} className="view-enter flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                    <FileText className="w-4 h-4 text-red-500 shrink-0" />
+                    <span className="flex-1 truncate font-medium text-slate-800">{f.name}</span>
+                    <span className="text-slate-400">{formatBytes(f.size)}</span>
+                    <button type="button" onClick={() => setFiles(files.filter((_, j) => j !== i))} className="p-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50" aria-label={`Quitar ${f.name}`}>
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Tipo de Intercambio:
-              </label>
-              <select
-                value={exchangeType}
-                onChange={(e) => setExchangeType(e.target.value as any)}
-                className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-white"
-              >
-                <option value="Intercambio Académico">Intercambio Académico</option>
-                <option value="Gratuito / RSU">Gratuito / RSU</option>
-                <option value="Colaboración en Equipo">Colaboración en Equipo</option>
-              </select>
+              <span className="block text-xs font-semibold text-slate-700 mb-1.5">¿Cómo se accede a tus archivos?</span>
+              <div className="grid sm:grid-cols-3 gap-2 text-xs" role="radiogroup">
+                {ACCESS_OPTIONS.map((o) => (
+                  <button
+                    key={o.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={exchangeType === o.value}
+                    onClick={() => setExchangeType(o.value)}
+                    className={`p-3 rounded-xl border text-left transition ${exchangeType === o.value ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                  >
+                    <span className="block font-bold">{o.label}</span>
+                    <span className={`block text-[11px] mt-0.5 ${exchangeType === o.value ? 'text-slate-300' : 'text-slate-500'}`}>{o.hint}</span>
+                  </button>
+                ))}
+              </div>
             </div>
+          </div>
+
+          {/* Resource link */}
+          <div>
+            <label htmlFor="pub-url" className="block text-xs font-semibold text-slate-700 mb-1">
+              O comparte un enlace <span className="font-normal text-slate-400">(opcional)</span>
+            </label>
+            <input
+              id="pub-url"
+              type="url"
+              inputMode="url"
+              placeholder="https://drive.google.com/… o enlace de Google Meet"
+              value={resourceUrl}
+              onChange={(e) => setResourceUrl(e.target.value)}
+              className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-white"
+            />
+            <p className="text-[11px] text-slate-400 mt-1">
+              Útil para archivos grandes o sesiones en línea (Drive, OneDrive, Meet).
+            </p>
           </div>
 
           {/* Description */}
@@ -349,138 +452,32 @@ export const CreatePublicationModal: React.FC = () => {
             />
           </div>
 
-          {/* AI Originality & Academic Integrity Audit Section */}
-          <div className="bg-gradient-to-br from-slate-900 to-[#19223c] rounded-2xl p-4 text-white space-y-3 border border-slate-800 shadow-md">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <Brain className="w-4 h-4 text-red-400" />
-                  <h4 className="font-bold text-xs uppercase tracking-wider text-slate-100">
-                    Auditoría de Originalidad con IA (Gemini 3.8 Flash)
-                  </h4>
-                </div>
-                <p className="text-[11px] text-slate-300">
-                  Verifica preventivamente que tu material cumpla con el Art. 10 de Integridad de la UCV antes de publicar.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleRunAIAudit}
-                disabled={isAuditing}
-                className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold text-xs shadow-md transition-all shrink-0 cursor-pointer"
-              >
-                {isAuditing ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
-                    <span>Auditando con IA...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                    <span>{auditResult ? 'Re-analizar Originalidad' : 'Analizar Originalidad con IA'}</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {auditError && (
-              <div className="p-3 bg-red-500/20 border border-red-500/40 rounded-xl text-red-200 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                <span>{auditError}</span>
-              </div>
-            )}
-
-            {auditResult && (
-              <div className="bg-slate-950/80 rounded-xl p-3.5 border border-slate-700/80 space-y-3 animate-fadeIn text-xs">
-                {/* Score and Verdict Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-black text-emerald-400 font-display">
-                        {auditResult.originalityScore}%
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-medium">Originalidad estimada</span>
-                    </div>
-                  </div>
-
-                  <span
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${
-                      auditResult.verdict === 'APROBADO_INTEGRO'
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                        : auditResult.verdict === 'REQUIERE_CITACION'
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        : 'bg-red-500/20 text-red-300 border border-red-500/30'
-                    }`}
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    {auditResult.verdict === 'APROBADO_INTEGRO'
-                      ? 'Aprobado Íntegro'
-                      : auditResult.verdict === 'REQUIERE_CITACION'
-                      ? 'Requiere Citas Formato UCV'
-                      : 'Posible Riesgo de Similitud'}
-                  </span>
-                </div>
-
-                {/* Progress Bar */}
-                <div className="space-y-1">
-                  <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-700"
-                      style={{ width: `${Math.min(100, Math.max(5, auditResult.originalityScore))}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Summary */}
-                <p className="text-slate-300 text-[11px] leading-relaxed">
-                  {auditResult.summary}
-                </p>
-
-                {/* Strengths & Suggestions */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
-                  <div className="p-2.5 bg-slate-900/90 rounded-lg border border-slate-800/80 space-y-1">
-                    <span className="font-bold text-emerald-400 block">Fortalezas Académicas:</span>
-                    <ul className="list-disc list-inside text-slate-300 space-y-0.5">
-                      {auditResult.strengths.slice(0, 2).map((s, idx) => (
-                        <li key={idx}>{s}</li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="p-2.5 bg-slate-900/90 rounded-lg border border-slate-800/80 space-y-1">
-                    <span className="font-bold text-amber-300 block">Recomendaciones Éticas:</span>
-                    <ul className="list-disc list-inside text-slate-300 space-y-0.5">
-                      {auditResult.suggestions.slice(0, 2).map((s, idx) => (
-                        <li key={idx}>{s}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="text-[10px] text-slate-400 italic pt-1 border-t border-slate-800/80 flex items-center gap-1.5">
-                  <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
-                  <span>{auditResult.academicIntegrityNote}</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Anti-plagiarism Declaration (Section 10 of PDF) */}
-          <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2">
-            <div className="flex items-start gap-3">
+          {/* Declaración de responsabilidad */}
+          <fieldset className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+            <legend className="px-1 text-xs font-bold uppercase tracking-wider text-slate-700">Declaración de responsabilidad</legend>
+            <p className="text-xs text-slate-600">Al publicar, declaro que:</p>
+            <ul className="space-y-1.5 text-xs text-slate-700">
+              {RESPONSIBILITY_POINTS.map((t) => (
+                <li key={t} className="flex gap-2">
+                  <span className="mt-1.5 w-1 h-1 rounded-full bg-red-500 shrink-0" />
+                  {t}
+                </li>
+              ))}
+            </ul>
+            <label htmlFor="integrity-check" className="flex items-start gap-2.5 pt-2 border-t border-slate-200 cursor-pointer">
               <input
                 id="integrity-check"
                 type="checkbox"
                 checked={academicIntegrityChecked}
                 onChange={(e) => setAcademicIntegrityChecked(e.target.checked)}
-                className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-slate-300 rounded"
+                className="mt-0.5 h-4 w-4 accent-red-600"
               />
-              <label htmlFor="integrity-check" className="text-xs text-amber-900 leading-relaxed">
-                <strong>Declaración de Integridad y Derechos de Autor UCV:</strong> Declaro que este material o propuesta es de mi autoría o legítimo para intercambio formativo, y no promueve el plagio ni la copia indebida, conforme a las políticas del proyecto Exchange UCV Grupo 5.
-              </label>
-            </div>
-          </div>
+              <span className="text-xs font-semibold text-slate-900">
+                Me hago responsable de lo que publico y acepto que los administradores pueden ocultar o eliminar esta
+                publicación si incumple estas condiciones.
+              </span>
+            </label>
+          </fieldset>
 
           {/* Submit buttons */}
           <div className="flex items-center justify-end gap-3 pt-2">
@@ -494,9 +491,10 @@ export const CreatePublicationModal: React.FC = () => {
 
             <button
               type="submit"
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 text-white font-bold text-xs shadow-lg shadow-red-600/30 hover:from-red-500 hover:to-rose-500 transition-all"
+              disabled={isSaving}
+              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 disabled:opacity-60 text-white font-bold text-xs shadow-lg shadow-red-600/30 hover:from-red-500 hover:to-rose-500 transition-all"
             >
-              Publicar Inmediatamente
+              {isSaving ? 'Guardando archivos…' : 'Publicar'}
             </button>
           </div>
         </form>

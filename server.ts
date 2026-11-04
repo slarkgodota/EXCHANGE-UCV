@@ -12,149 +12,83 @@ async function startServer() {
   const app = express();
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-  app.use(express.json({ limit: '10mb' }));
+  app.disable('x-powered-by');
+  app.use(express.json({ limit: '100kb' }));
 
-  // Initialize Gemini AI on the server side
+  // Gemini solo se activa si hay una clave real en .env (GEMINI_API_KEY)
   const rawKey = process.env.GEMINI_API_KEY;
-  const apiKey = rawKey && rawKey.trim() !== '' && rawKey !== 'MY_GEMINI_API_KEY' ? rawKey : undefined;
-  const ai = apiKey
-    ? new GoogleGenAI({
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          },
-        },
-      })
-    : null;
+  const apiKey = rawKey && rawKey.trim() !== '' && rawKey !== 'MY_GEMINI_API_KEY' ? rawKey.trim() : undefined;
+  const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+  const model = process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash';
 
-  // Endpoint: Auditoría de Originalidad e Integridad Académica UCV con Gemini 3.8 Flash
+  const clip = (v: unknown, max: number) => String(v ?? '').slice(0, max);
+
+  // Auditoría orientativa de integridad académica. Si la IA no está disponible se
+  // responde con un error claro: nunca se inventa un resultado.
   app.post('/api/ai/audit-originality', async (req, res) => {
-    try {
-      const { title, course, career, description, category, exchangeType } = req.body;
+    const title = clip(req.body?.title, 200).trim();
+    const description = clip(req.body?.description, 4000).trim();
+    if (!title || !description) {
+      return res.status(400).json({ error: 'Se requiere título y descripción del material.' });
+    }
+    if (!ai) {
+      return res.status(503).json({
+        error: 'La auditoría con IA no está configurada en este servidor (falta GEMINI_API_KEY).',
+      });
+    }
 
-      if (!title || !description) {
-        return res.status(400).json({
-          error: 'Se requiere título y descripción del material para la evaluación de originalidad.',
-        });
-      }
-
-      if (!ai) {
-        // Fallback pedagógico si no hay clave de API configurada en el entorno
-        return res.json({
-          originalityScore: 94,
-          verdict: 'APROBADO_INTEGRO',
-          summary:
-            'El recurso presenta una estructura pedagógica orientada al aprendizaje formativo entre pares, sin indicios de vulneración de derechos de autor conforme al Art. 10 de Exchange UCV.',
-          strengths: [
-            'Enfoque formativo y explicativo para apoyo entre estudiantes de la UCV',
-            'Definición clara de temas y competencias del curso',
-            'Alineado a las políticas de intercambio formativo y Responsabilidad Social Universitaria',
-          ],
-          suggestions: [
-            'Se recomienda incluir referencias bibliográficas en formato APA 7ma edición o Vancouver si cita autores específicos',
-            'Indicar las fórmulas o metodologías conforme a la cátedra de la escuela profesional',
-          ],
-          academicIntegrityNote:
-            'Aprobado preliminarmente para publicación en el catálogo nacional de Exchange UCV.',
-        });
-      }
-
-      const prompt = `Actúa como el Auditor de Integridad Académica y Lucha contra el Plagio de la Universidad César Vallejo (UCV) para la plataforma colaborativa "Exchange UCV (Grupo 5)".
-Evalúa el siguiente recurso académico compartido por un estudiante para verificar que sirva para el aprendizaje y no promueva fraude, copia de evaluaciones o plagio:
+    const prompt = `Evalúa el siguiente recurso que un estudiante quiere compartir en "Exchange UCV", una plataforma estudiantil de intercambio académico.
+Determina si sirve para el aprendizaje y si hay señales de plagio, venta de evaluaciones resueltas o falta de citación.
+Responde en español. Sé honesto: si la descripción es insuficiente para juzgar, dilo en el resumen y usa REQUIERE_CITACION.
 
 - Título: ${title}
-- Asignatura/Curso: ${course || 'General'}
-- Carrera Profesional: ${career || 'Ingeniería Civil'}
-- Sección: ${category || 'Materiales'}
-- Modalidad: ${exchangeType || 'Intercambio Académico'}
-- Contenido / Descripción:
+- Curso: ${clip(req.body?.course, 120) || 'No indicado'}
+- Carrera: ${clip(req.body?.career, 80) || 'No indicada'}
+- Sección: ${clip(req.body?.category, 40) || 'No indicada'}
+- Modalidad: ${clip(req.body?.exchangeType, 60) || 'No indicada'}
+- Descripción:
 """
 ${description}
-"""
+"""`;
 
-Evalúa objetivamente:
-1. Nivel de aporte académico propio, explicativo y formativo.
-2. Que no sea una venta ilícita de exámenes resueltos ni plagio flagrante.
-3. El uso responsable del material para consulta y estudio.
-4. Recomendaciones para mantener altos estándares éticos según las normas de la UCV.`;
-
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Gemini timeout')), 6500)
+    try {
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 15000)
       );
-
       const response = await Promise.race([
         ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+          model,
           contents: prompt,
           config: {
             systemInstruction:
-              'Eres el evaluador de integridad académica de la Universidad César Vallejo. Analiza el contenido con rigurosidad académica y pedagógica, fomentando el aprendizaje ético y evitando el fraude o plagio.',
+              'Eres un evaluador de integridad académica. Analiza con rigor, sin exagerar ni aprobar por defecto. Los puntajes son orientativos.',
             responseMimeType: 'application/json',
             responseSchema: {
               type: Type.OBJECT,
               properties: {
-                originalityScore: {
-                  type: Type.INTEGER,
-                  description: 'Porcentaje estimado de originalidad y aporte formativo (0 a 100)',
-                },
-                verdict: {
-                  type: Type.STRING,
-                  enum: ['APROBADO_INTEGRO', 'REQUIERE_CITACION', 'RIESGO_SIMILITUD'],
-                  description: 'Veredicto de conformidad académica',
-                },
-                summary: {
-                  type: Type.STRING,
-                  description: 'Resumen conciso del análisis de integridad',
-                },
-                strengths: {
-                  type: Type.ARRAY,
-                  items: { type: Type.STRING },
-                  description: 'Fortalezas detectadas en el material formativo',
-                },
-                suggestions: {
-                  type: Type.ARRAY,
-                  items: { type: Type.STRING },
-                  description: 'Recomendaciones éticas o de citación',
-                },
-                academicIntegrityNote: {
-                  type: Type.STRING,
-                  description: 'Nota de conformidad con los reglamentos de la UCV',
-                },
+                originalityScore: { type: Type.INTEGER, description: 'Aporte formativo y originalidad estimados (0-100)' },
+                verdict: { type: Type.STRING, enum: ['APROBADO_INTEGRO', 'REQUIERE_CITACION', 'RIESGO_SIMILITUD'] },
+                summary: { type: Type.STRING },
+                strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+                suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
+                academicIntegrityNote: { type: Type.STRING },
               },
-              required: [
-                'originalityScore',
-                'verdict',
-                'summary',
-                'strengths',
-                'suggestions',
-                'academicIntegrityNote',
-              ],
+              required: ['originalityScore', 'verdict', 'summary', 'strengths', 'suggestions', 'academicIntegrityNote'],
             },
           },
         }),
-        timeoutPromise,
+        timeout,
       ]);
-
-      const responseText = response.text || '{}';
-      const parsed = JSON.parse(responseText);
+      const parsed = JSON.parse(response.text || '{}');
+      if (typeof parsed.originalityScore !== 'number' || !parsed.verdict) {
+        throw new Error('Respuesta incompleta del modelo');
+      }
+      parsed.originalityScore = Math.max(0, Math.min(100, Math.round(parsed.originalityScore)));
       return res.json(parsed);
-    } catch (err: any) {
-      console.warn('Fallo o alta demanda temporal en Gemini (503/429), aplicando evaluación pedagógica de respaldo:', err);
-      const isShort = (req.body.description || '').trim().length < 50;
-      return res.json({
-        originalityScore: isShort ? 89 : 96,
-        verdict: 'APROBADO_INTEGRO',
-        summary: `El recurso "${req.body.title || 'Material Académico'}" presenta una formulación pedagógica orientada al estudio y refuerzo formativo, cumpliendo con los estándares de probidad del Grupo 5 y la UCV.`,
-        strengths: [
-          'Enfoque formativo para el reforzamiento académico entre compañeros de la UCV',
-          'Aporte de ejercicios y conceptos estructurados para ' + (req.body.career || 'Ingeniería Civil'),
-        ],
-        suggestions: [
-          'Se recomienda incluir referencias bibliográficas en formato APA 7ma edición o Vancouver',
-          'Citar fuentes o autores de fórmulas de referencia si corresponde',
-        ],
-        academicIntegrityNote: 'Certificado de conformidad ética según el Art. 10 de Exchange UCV.',
+    } catch (err) {
+      console.warn('Fallo en la auditoría con Gemini:', err);
+      return res.status(502).json({
+        error: 'El servicio de IA no respondió. Inténtalo de nuevo en unos minutos.',
       });
     }
   });
@@ -164,7 +98,8 @@ Evalúa objetivamente:
     res.json({
       status: 'ok',
       service: 'Exchange UCV Backend',
-      geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
+      geminiConfigured: Boolean(ai),
+      model: ai ? model : null,
     });
   });
 
