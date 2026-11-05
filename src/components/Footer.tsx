@@ -2,6 +2,13 @@ import React from 'react';
 import { useExchange } from '../context/ExchangeContext';
 import { goTo } from '../utils/router';
 
+const AUTHORS = [
+  { name: 'DELGADO CERDÁN, Michael Jefferson', orcid: '0009-0004-9087-2490' },
+  { name: 'GONZALEZ GUEVARA, José Roly', orcid: '0009-0008-6874-4045' },
+  { name: 'GRANDEZ ACOSTA, Michael Cristofer', orcid: '0009-0004-9770-9557' },
+  { name: 'Docente: Ing. Alex Tongo Silva', orcid: '0000-0001-5503-3692', docente: true },
+];
+
 export const Footer: React.FC = () => {
   const { setIsProjectInfoModalOpen, syncStatus } = useExchange();
 
@@ -22,8 +29,16 @@ export const Footer: React.FC = () => {
         </nav>
         <div>
           <p className="text-white font-semibold">Grupo 5 · Ingeniería Civil · UCV Moyobamba</p>
-          <p className="mt-2">Delgado Cerdán, M. J. · Gonzalez Guevara, J. R. · Grandez Acosta, M. C.</p>
-          <p className="mt-1">Docente: Ing. Alex Tongo Silva</p>
+          <ul className="mt-2 space-y-1.5">
+            {AUTHORS.map((a) => (
+              <li key={a.orcid}>
+                <span className={a.docente ? 'text-amber-300' : 'text-slate-300'}>{a.name}</span>{' '}
+                <a href={`https://orcid.org/${a.orcid}`} target="_blank" rel="noopener noreferrer" className="text-red-400 hover:text-red-300 hover:underline text-xs whitespace-nowrap">
+                  (orcid.org/{a.orcid})
+                </a>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
       <div className="border-t border-white/10">
