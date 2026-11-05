@@ -19,6 +19,7 @@
     --color-amber-50: oklch(98.7% 0.022 95.277);
     --color-amber-100: oklch(96.2% 0.059 95.617);
     --color-amber-200: oklch(92.4% 0.12 95.746);
+    --color-amber-300: oklch(87.9% 0.169 91.605);
     --color-amber-400: oklch(82.8% 0.189 84.429);
     --color-amber-500: oklch(76.9% 0.188 70.08);
     --color-amber-600: oklch(66.6% 0.179 58.318);
@@ -1511,6 +1512,9 @@
   .text-\[\#AB2A30\] {
     color: #AB2A30;
   }
+  .text-amber-300 {
+    color: var(--color-amber-300);
+  }
   .text-amber-400 {
     color: var(--color-amber-400);
   }
@@ -1955,6 +1959,9 @@
     .hover\:to-rose-500:hover {
       --tw-gradient-to: var(--color-rose-500);
       --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+    }
+    .hover\:text-red-300:hover {
+      color: var(--color-red-300);
     }
     .hover\:text-red-600:hover {
       color: var(--color-red-600);
