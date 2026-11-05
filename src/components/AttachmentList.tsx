@@ -2,15 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { Download, FileText, FileImage, Lock, Loader2 } from 'lucide-react';
 import { Publication } from '../types/exchange';
 import { useExchange } from '../context/ExchangeContext';
-import { getFile, downloadBlob, formatBytes, extensionOf } from '../utils/fileStore';
+import { getAttachmentBlob, downloadBlob, formatBytes, extensionOf } from '../utils/fileStore';
 
 const isImage = (name: string) => ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(extensionOf(name));
 
-const Thumb: React.FC<{ id: string; name: string }> = ({ id, name }) => {
+const Thumb: React.FC<{ id: string; name: string; path?: string }> = ({ id, name, path }) => {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     let u: string | null = null;
-    getFile(id).then((b) => {
+    getAttachmentBlob({ id, path }).then((b) => {
       if (b) {
         u = URL.createObjectURL(b);
         setUrl(u);
@@ -40,13 +40,13 @@ export const AttachmentList: React.FC<{ pub: Publication; onNeedRequest: () => v
   const access = canDownload(pub);
   const free = pub.exchangeType === 'Gratuito / RSU';
 
-  const download = async (id: string, name: string) => {
+  const download = async (id: string, name: string, path?: string) => {
     setBusy(id);
     setMsg(null);
-    const blob = await getFile(id);
+    const blob = await getAttachmentBlob({ id, path });
     if (!blob) {
       setBusy(null);
-      setMsg('Este archivo no está disponible en este dispositivo.');
+      setMsg('No se pudo obtener el archivo. Revisa tu conexión e inténtalo otra vez.');
       return;
     }
     const res = await downloadBlob(blob, name);
@@ -68,7 +68,7 @@ export const AttachmentList: React.FC<{ pub: Publication; onNeedRequest: () => v
         {files.map((f) => (
           <li key={f.id} className="flex items-center gap-3 p-3 rounded-2xl border border-slate-200 bg-white">
             {isImage(f.name) && access.allowed ? (
-              <Thumb id={f.id} name={f.name} />
+              <Thumb id={f.id} name={f.name} path={f.path} />
             ) : (
               <span className="w-12 h-12 rounded-lg bg-red-50 text-red-600 flex items-center justify-center shrink-0 text-[10px] font-black uppercase">
                 {extensionOf(f.name) || <FileText className="w-5 h-5" />}
@@ -81,7 +81,7 @@ export const AttachmentList: React.FC<{ pub: Publication; onNeedRequest: () => v
             {access.allowed ? (
               <button
                 type="button"
-                onClick={() => download(f.id, f.name)}
+                onClick={() => download(f.id, f.name, f.path)}
                 disabled={busy === f.id}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-slate-900 hover:bg-red-600 disabled:opacity-60 text-white text-xs font-bold transition"
               >

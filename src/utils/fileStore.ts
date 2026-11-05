@@ -1,3 +1,4 @@
+import { isRemoteEnabled, downloadFile } from './remote';
 /**
  * Almacén de archivos adjuntos en IndexedDB (admite archivos de varios MB,
  * a diferencia de localStorage). Si IndexedDB no está disponible se usa memoria.
@@ -64,6 +65,18 @@ export async function getFile(id: string): Promise<Blob | undefined> {
   } catch {
     return undefined;
   }
+}
+
+/** Trae el archivo de un adjunto: de la base de datos compartida si tiene ruta, si no del navegador. */
+export async function getAttachmentBlob(meta: { id: string; path?: string }): Promise<Blob | undefined> {
+  if (meta.path && isRemoteEnabled()) {
+    try {
+      return await downloadFile(meta.path);
+    } catch {
+      return undefined;
+    }
+  }
+  return getFile(meta.id);
 }
 
 export async function deleteFile(id: string): Promise<void> {

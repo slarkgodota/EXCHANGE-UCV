@@ -86,10 +86,13 @@ const LoginForm: React.FC<{ onSwitch: (m: AuthMode) => void }> = ({ onSwitch }) 
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const submit = (e: React.FormEvent) => {
+  const [busy, setBusy] = useState(false);
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const res = loginUser(email, password);
+    setBusy(true);
+    const res = await loginUser(email, password);
+    setBusy(false);
     if (!res.ok) setError(res.error || 'No se pudo iniciar sesión.');
   };
 
@@ -122,7 +125,8 @@ const LoginForm: React.FC<{ onSwitch: (m: AuthMode) => void }> = ({ onSwitch }) 
       </div>
       <button
         type="submit"
-        className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 active:scale-[0.99] text-white font-bold text-sm shadow-md shadow-red-600/20 transition flex items-center justify-center gap-2"
+        disabled={busy}
+        className="w-full py-3 rounded-xl disabled:opacity-60 bg-red-600 hover:bg-red-700 active:scale-[0.99] text-white font-bold text-sm shadow-md shadow-red-600/20 transition flex items-center justify-center gap-2"
       >
         <LogIn className="w-4 h-4" />
         Iniciar sesión
@@ -150,10 +154,12 @@ const RegisterForm: React.FC<{ onSwitch: (m: AuthMode) => void }> = ({ onSwitch 
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const submit = (e: React.FormEvent) => {
+  const [busy, setBusy] = useState(false);
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const res = registerUser({
+    setBusy(true);
+    const res = await registerUser({
       name,
       email,
       password,
@@ -164,6 +170,7 @@ const RegisterForm: React.FC<{ onSwitch: (m: AuthMode) => void }> = ({ onSwitch 
       phone,
       acceptedTerms: accepted,
     });
+    setBusy(false);
     if (!res.ok) setError(res.error || 'No se pudo crear la cuenta.');
   };
 
@@ -245,7 +252,8 @@ const RegisterForm: React.FC<{ onSwitch: (m: AuthMode) => void }> = ({ onSwitch 
       </label>
       <button
         type="submit"
-        className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 active:scale-[0.99] text-white font-bold text-sm shadow-md shadow-red-600/20 transition flex items-center justify-center gap-2"
+        disabled={busy}
+        className="w-full py-3 rounded-xl disabled:opacity-60 bg-red-600 hover:bg-red-700 active:scale-[0.99] text-white font-bold text-sm shadow-md shadow-red-600/20 transition flex items-center justify-center gap-2"
       >
         <UserPlus className="w-4 h-4" />
         Crear mi cuenta
@@ -267,9 +275,9 @@ const AccountPanel: React.FC = () => {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   if (!currentUser) return null;
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = changePassword(current, next);
+    const res = await changePassword(current, next);
     setMsg(res.ok ? { ok: true, text: 'Contraseña actualizada.' } : { ok: false, text: res.error || 'Error' });
     if (res.ok) {
       setCurrent('');

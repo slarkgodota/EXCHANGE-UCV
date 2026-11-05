@@ -83,6 +83,7 @@ const CatalogView: React.FC = () => {
 
 const ExchangePortal: React.FC = () => {
   const view = useView();
+  const { syncStatus, syncError } = useExchange();
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   useEffect(() => {
     const on = () => setIsOnline(true);
@@ -101,6 +102,14 @@ const ExchangePortal: React.FC = () => {
         <div className="bg-amber-500 text-amber-950 text-xs font-bold py-2 px-4 flex items-center justify-center gap-2">
           <WifiOff className="w-4 h-4" /> Sin conexión: puedes ver lo guardado en este dispositivo.
         </div>
+      )}
+      {(syncStatus === 'error' || syncError) && (
+        <div role="alert" className="bg-red-600 text-white text-xs font-semibold py-2 px-4 text-center">
+          {syncError || 'No se pudo conectar con la base de datos. Lo que veas puede no estar actualizado.'}
+        </div>
+      )}
+      {syncStatus === 'loading' && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-slate-900 text-white text-xs shadow-lg">Cargando publicaciones…</div>
       )}
       <Navbar view={view} />
 

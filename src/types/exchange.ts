@@ -170,4 +170,6 @@ export interface AttachmentMeta {
   name: string;
   size: number;
   type: string;
+  /** Ruta en el almacenamiento compartido (Supabase) cuando la base de datos está activa. */
+  path?: string;
 }

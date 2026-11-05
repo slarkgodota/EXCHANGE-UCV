@@ -3,7 +3,7 @@ import { useExchange } from '../context/ExchangeContext';
 import { goTo } from '../utils/router';
 
 export const Footer: React.FC = () => {
-  const { setIsProjectInfoModalOpen } = useExchange();
+  const { setIsProjectInfoModalOpen, syncStatus } = useExchange();
 
   return (
     <footer className="bg-[#0a1430] text-slate-400 mt-10">
@@ -29,6 +29,10 @@ export const Footer: React.FC = () => {
       <div className="border-t border-white/10">
         <p className="max-w-6xl mx-auto px-4 sm:px-6 py-4 text-xs">
           © 2026 Exchange UCV · Comparte solo material propio o de libre acceso y cita tus fuentes.
+          <span className="ml-3 inline-flex items-center gap-1.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'online' ? 'bg-emerald-400' : syncStatus === 'loading' ? 'bg-amber-400' : syncStatus === 'error' ? 'bg-red-500' : 'bg-slate-500'}`} />
+            {syncStatus === 'online' ? 'Datos compartidos en línea' : syncStatus === 'loading' ? 'Conectando…' : syncStatus === 'error' ? 'Sin conexión con la base de datos' : 'Guardado en este navegador'}
+          </span>
         </p>
       </div>
     </footer>

@@ -47,9 +47,25 @@ En Windows también puedes hacer doble clic en `iniciar_en_windows.bat` (en Mac/
 
 Desde el botón **Admin** se ve el registro completo de usuarios, el **historial de actividad** (registros, inicios de sesión, publicaciones, solicitudes, reportes, cambios de rol), se descargan ambos en Excel (CSV), se asignan roles (Estudiante, Profesor / Docente, Administrador, etc.), se crean roles nuevos, se moderan publicaciones y se atienden reportes.
 
-## Limitación importante (siguiente paso)
+## Base de datos compartida (Supabase)
 
-Los datos se guardan en el **navegador de cada dispositivo** (`localStorage`). Es ideal para presentar el prototipo, pero dos personas en computadoras distintas no ven las mismas publicaciones. Para usarlo en serio entre estudiantes hace falta un backend con base de datos compartida y autenticación real (por ejemplo Supabase o Firebase).
+Para que lo que publica una persona lo vean todos, la página se conecta a Supabase (gratis):
+
+1. Crea un proyecto en [supabase.com](https://supabase.com).
+2. En **SQL Editor → New query**, pega todo el archivo `supabase/schema.sql` y pulsa **Run**. Crea las tablas, las cuentas iniciales y la carpeta de archivos `adjuntos`.
+3. En **Project Settings → API** copia la **Project URL** y la clave **anon public**.
+4. Pégalas en `config.js` (en la rama `gh-pages`, o en `public/config.js` del código):
+
+```js
+window.EXCHANGE_CONFIG = {
+  supabaseUrl: 'https://xxxx.supabase.co',
+  supabaseAnonKey: 'eyJ...',
+};
+```
+
+Sin esos datos la página funciona igual, pero guarda todo solo en el navegador de cada persona. El pie de página indica el modo: "Datos compartidos en línea" o "Guardado en este navegador".
+
+Las contraseñas se guardan cifradas con bcrypt en la tabla `accounts`, que no se puede leer desde la página. El resto de datos (publicaciones, perfiles, historial) es de lectura y escritura pública con la clave anon: suficiente para un prototipo, pero no para datos sensibles.
 
 ## Estructura
 

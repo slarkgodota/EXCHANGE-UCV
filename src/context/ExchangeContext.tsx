@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import {
   Publication,
@@ -24,6 +24,25 @@ import {
 } from '../data/initialData';
 import { calculateRatingDistribution } from '../utils/exchangeLogic';
 import { putFile, deleteFile, clearFiles } from '../utils/fileStore';
+import { isRemoteEnabled, fetchAll, upsertRows, deleteRows, rpc, uploadFile, removeFiles, safeName, RemoteRow } from '../utils/remote';
+
+const REMOTE = isRemoteEnabled();
+
+/** JSON con las claves ordenadas: la base de datos reordena las claves y así se comparan bien. */
+function stable(v: any): string {
+  if (Array.isArray(v)) return '[' + v.map(stable).join(',') + ']';
+  if (v && typeof v === 'object') {
+    return '{' + Object.keys(v).filter((k) => v[k] !== undefined).sort().map((k) => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}';
+  }
+  return JSON.stringify(v ?? null);
+}
+
+const stripUser = (u: StudentUser) => {
+  const { passwordHash, passwordSalt, ...rest } = u;
+  return rest as StudentUser;
+};
+
+export type SyncStatus = 'local' | 'loading' | 'online' | 'error';
 import {
   generateSalt,
   hashPassword,
@@ -130,10 +149,10 @@ interface ExchangeContextType {
   }) => ActionResult;
   resolveReport: (reportId: string, newStatus: PlagiarismReport['status']) => void;
 
-  loginUser: (email: string, password: string) => ActionResult;
+  loginUser: (email: string, password: string) => Promise<ActionResult>;
   logoutUser: () => void;
-  registerUser: (data: RegisterInput) => ActionResult;
-  changePassword: (currentPassword: string, newPassword: string) => ActionResult;
+  registerUser: (data: RegisterInput) => Promise<ActionResult>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<ActionResult>;
   updateProfile: (data: Partial<Pick<StudentUser, 'name' | 'career' | 'campus' | 'cycle' | 'phone' | 'bio' | 'orcid'>>) => void;
 
   roles: RoleDefinition[];
@@ -159,6 +178,8 @@ interface ExchangeContextType {
   resetDatabase: () => void;
   libraryRatings: LibraryRatings;
   activity: ActivityEntry[];
+  syncStatus: SyncStatus;
+  syncError: string | null;
   rateLibraryResource: (resourceId: string, stars: number) => ActionResult;
 }
 
@@ -166,7 +187,8 @@ const ExchangeContext = createContext<ExchangeContextType | undefined>(undefined
 
 // v5: contraseñas con hash y sin datos de demostración. Las claves v4 (con datos
 // ficticios) se ignoran a propósito.
-const STORAGE_KEYS = {
+const KEY_SUFFIX = REMOTE ? '_cache' : '';
+const STORAGE_KEYS_BASE = {
   PUBLICATIONS: 'exchange_ucv_publications_v5',
   USERS: 'exchange_ucv_users_v5',
   ROLES: 'exchange_ucv_roles_v5',
@@ -176,6 +198,9 @@ const STORAGE_KEYS = {
   LIBRARY_RATINGS: 'exchange_ucv_library_ratings_v5',
   ACTIVITY: 'exchange_ucv_activity_v5',
 };
+const STORAGE_KEYS = Object.fromEntries(
+  Object.entries(STORAGE_KEYS_BASE).map(([k, v]) => [k, k === 'CURRENT_USER_ID' ? v : v + KEY_SUFFIX])
+) as typeof STORAGE_KEYS_BASE;
 
 export type ActivityType =
   | 'registro'
@@ -267,7 +292,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const [users, setUsers] = useState<StudentUser[]>(() => {
     const saved = loadJSON<StudentUser[]>(STORAGE_KEYS.USERS, []);
-    const valid = saved.filter((u) => u && u.email && u.passwordHash && u.passwordSalt);
+    const valid = saved.filter((u) => u && u.email && (REMOTE || (u.passwordHash && u.passwordSalt)));
     // Las cuentas de los autores siempre existen
     const missingFounders = INITIAL_USERS.filter(
       (f) => !valid.some((u) => u.email.toLowerCase() === f.email.toLowerCase())
@@ -313,6 +338,106 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       ].slice(0, MAX_ACTIVITY)
     );
   };
+
+  // ───────────── Base de datos compartida ─────────────
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(REMOTE ? 'loading' : 'local');
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const loadedRef = useRef(false);
+  const snap = useRef<Record<string, Map<string, string>>>({});
+  const pending = useRef<Record<string, number>>({});
+
+  const ratingsToRows = (m: LibraryRatings) =>
+    Object.entries(m).flatMap(([resourceId, votes]) =>
+      Object.entries(votes).map(([userId, stars]) => ({ id: `${resourceId}::${userId}`, resourceId, userId, stars }))
+    );
+
+  const syncCollection = (name: string, list: { id: string }[]) => {
+    if (!REMOTE || !loadedRef.current) return;
+    const prev = snap.current[name] || new Map<string, string>();
+    const next = new Map(list.map((x) => [x.id, stable(x)] as [string, string]));
+    const changed = list.filter((x) => prev.get(x.id) !== next.get(x.id));
+    const removed = [...prev.keys()].filter((id) => !next.has(id));
+    if (changed.length === 0 && removed.length === 0) return;
+    snap.current[name] = next;
+    pending.current[name] = (pending.current[name] || 0) + 1;
+    Promise.all([upsertRows(name, changed), deleteRows(name, removed)])
+      .then(() => setSyncError(null))
+      .catch((e) => {
+        console.warn('No se pudo guardar en la base de datos', e);
+        setSyncError('No se pudo guardar el último cambio en la base de datos. Revisa tu conexión.');
+        snap.current[name] = prev;
+      })
+      .finally(() => {
+        pending.current[name] = Math.max(0, (pending.current[name] || 1) - 1);
+      });
+  };
+
+  const applyRemote = (rows: RemoteRow[], initial: boolean) => {
+    const by: Record<string, any[]> = {};
+    for (const r of rows) (by[r.collection] ||= []).push(r.data);
+    const take = (name: string, setter: (list: any[]) => void, prepare: (list: any[]) => any[] = (l) => l) => {
+      if (!initial && (pending.current[name] || 0) > 0) return;
+      const raw = by[name] || [];
+      const m = new Map(raw.map((x: any) => [x.id, stable(x)] as [string, string]));
+      const prev = snap.current[name];
+      const same = prev && prev.size === m.size && [...m].every(([k, v]) => prev.get(k) === v);
+      if (same && !initial) return;
+      snap.current[name] = m;
+      setter(prepare(raw));
+    };
+    const desc = (a: any, b: any) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0);
+    take('publications', setPublications, (l) => [...l].sort(desc));
+    take('requests', setRequests, (l) => [...l].sort(desc));
+    take('reports', setReports, (l) => [...l].sort(desc));
+    take('activity', setActivity, (l) => [...l].sort((a, b) => (a.at < b.at ? 1 : -1)));
+    take('users', setUsers, (l) => {
+      const missing = INITIAL_USERS.filter((f) => !l.some((u: any) => u.email?.toLowerCase() === f.email.toLowerCase())).map(stripUser);
+      return [...missing, ...l];
+    });
+    take('roles', setRoles, (l) => {
+      const missing = DEFAULT_ROLES.filter((d) => !l.some((r: any) => r.id === d.id));
+      return [...l, ...missing];
+    });
+    take('ratings', (list) => {
+      const m: LibraryRatings = {};
+      for (const r of list) (m[r.resourceId] ||= {})[r.userId] = r.stars;
+      setLibraryRatings(m);
+    });
+  };
+
+  useEffect(() => {
+    if (!REMOTE) return;
+    let alive = true;
+    const pull = async (initial: boolean) => {
+      try {
+        const rows = await fetchAll();
+        if (!alive) return;
+        applyRemote(rows, initial || !loadedRef.current);
+        loadedRef.current = true;
+        setSyncStatus('online');
+      } catch (e) {
+        console.warn('No se pudo leer la base de datos', e);
+        if (alive) setSyncStatus(loadedRef.current ? 'online' : 'error');
+      }
+    };
+    pull(true);
+    const t = setInterval(() => pull(false), 10000);
+    const onFocus = () => pull(false);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      alive = false;
+      clearInterval(t);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
+
+  useEffect(() => syncCollection('publications', publications), [publications, syncStatus]);
+  useEffect(() => syncCollection('users', users.map(stripUser)), [users, syncStatus]);
+  useEffect(() => syncCollection('roles', roles), [roles, syncStatus]);
+  useEffect(() => syncCollection('requests', requests), [requests, syncStatus]);
+  useEffect(() => syncCollection('reports', reports), [reports, syncStatus]);
+  useEffect(() => syncCollection('ratings', ratingsToRows(libraryRatings)), [libraryRatings, syncStatus]);
+  useEffect(() => syncCollection('activity', activity), [activity, syncStatus]);
 
   const [filter, setFilter] = useState<FilterState>(DEFAULT_FILTER);
   const [selectedPublication, setSelectedPublicationState] = useState<Publication | null>(null);
@@ -416,10 +541,22 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   // ───────────── Autenticación ─────────────
-  const loginUser = (email: string, password: string): ActionResult => {
+  const loginUser = async (email: string, password: string): Promise<ActionResult> => {
     const target = email.toLowerCase().trim();
-    const found = users.find((u) => u.email.toLowerCase().trim() === target);
-    if (!found || !verifyPassword(password, found.passwordSalt, found.passwordHash)) {
+    let found: StudentUser | undefined;
+    if (REMOTE) {
+      try {
+        const uid = await rpc<string | null>('exchange_login', { p_email: target, p_password: password });
+        found = uid ? users.find((u) => u.id === uid) : undefined;
+        if (uid && !found) return { ok: false, error: 'Tu cuenta existe pero su perfil no cargó. Recarga la página e inténtalo de nuevo.' };
+      } catch {
+        return { ok: false, error: 'No se pudo conectar con la base de datos. Revisa tu internet.' };
+      }
+    } else {
+      found = users.find((u) => u.email.toLowerCase().trim() === target);
+      if (found && !verifyPassword(password, found.passwordSalt, found.passwordHash)) found = undefined;
+    }
+    if (!found) {
       return { ok: false, error: 'Correo o contraseña incorrectos.' };
     }
     setCurrentUserId(found.id);
@@ -429,7 +566,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return { ok: true };
   };
 
-  const registerUser = (data: RegisterInput): ActionResult => {
+  const registerUser = async (data: RegisterInput): Promise<ActionResult> => {
     const error = validateRegistration({
       name: data.name,
       email: data.email,
@@ -454,10 +591,19 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       ratingAverage: 0,
       ratingCount: 0,
       bio: '',
-      passwordSalt: salt,
-      passwordHash: hashPassword(data.password, salt),
+      passwordSalt: REMOTE ? '' : salt,
+      passwordHash: REMOTE ? '' : hashPassword(data.password, salt),
       createdAt: today(),
     };
+
+    if (REMOTE) {
+      try {
+        const created = await rpc<boolean>('exchange_register', { p_user_id: newUser.id, p_email: newUser.email, p_password: data.password });
+        if (!created) return { ok: false, error: 'Ya existe una cuenta con este correo. Inicia sesión.' };
+      } catch {
+        return { ok: false, error: 'No se pudo conectar con la base de datos. Revisa tu internet.' };
+      }
+    }
 
     setUsers((prev) => [...prev, newUser]);
     log('registro', `Nueva cuenta · ${newUser.career} · ${newUser.campus}${newUser.phone ? ' · ' + newUser.phone : ''}`, newUser);
@@ -475,13 +621,21 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     openAuth('login');
   };
 
-  const changePassword = (currentPassword: string, newPassword: string): ActionResult => {
+  const changePassword = async (currentPassword: string, newPassword: string): Promise<ActionResult> => {
     if (!currentUser) return { ok: false, error: 'Inicia sesión primero.' };
-    if (!verifyPassword(currentPassword, currentUser.passwordSalt, currentUser.passwordHash)) {
-      return { ok: false, error: 'La contraseña actual no es correcta.' };
-    }
     if (newPassword.length < 8 || !/[A-Za-z]/.test(newPassword) || !/\d/.test(newPassword)) {
       return { ok: false, error: 'La nueva contraseña debe tener 8+ caracteres con letras y números.' };
+    }
+    if (REMOTE) {
+      try {
+        const okChange = await rpc<boolean>('exchange_change_password', { p_email: currentUser.email, p_old: currentPassword, p_new: newPassword });
+        return okChange ? { ok: true } : { ok: false, error: 'La contraseña actual no es correcta.' };
+      } catch {
+        return { ok: false, error: 'No se pudo conectar con la base de datos.' };
+      }
+    }
+    if (!verifyPassword(currentPassword, currentUser.passwordSalt, currentUser.passwordHash)) {
+      return { ok: false, error: 'La contraseña actual no es correcta.' };
     }
     const salt = generateSalt();
     setUsers((prev) =>
@@ -519,6 +673,13 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       phone: userData.phone?.trim() || undefined,
       createdAt: today(),
     };
+    if (REMOTE) {
+      newUser.passwordHash = '';
+      newUser.passwordSalt = '';
+      rpc('exchange_register', { p_user_id: newUser.id, p_email: newUser.email, p_password: userData.password }).catch(() =>
+        setSyncError('No se pudo crear la contraseña de la nueva cuenta en la base de datos.')
+      );
+    }
     setUsers((prev) => [...prev, newUser]);
     log('cuenta_creada_admin', `Creó la cuenta de ${newUser.name} (${newUser.email}) con rol ${getRoleById(newUser.role).name}`);
     celebrate();
@@ -543,6 +704,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const target = users.find((u) => u.id === userId);
     if (!target || isProtected(target) || target.id === currentUserId) return false;
     log('cuenta_eliminada', `Eliminó la cuenta de ${target.name} (${target.email})`);
+    if (REMOTE) rpc('exchange_delete_account', { p_user_id: target.id }).catch(() => {});
     setUsers((prev) => prev.filter((u) => u.id !== userId));
     return true;
   };
@@ -579,15 +741,22 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // ───────────── Publicaciones ─────────────
   const addPublication = async (data: NewPublicationInput): Promise<Publication | null> => {
     if (!currentUser) return null;
-    const attachments: { id: string; name: string; size: number; type: string }[] = [];
+    const pubId = newId('pub');
+    const attachments: { id: string; name: string; size: number; type: string; path?: string }[] = [];
     for (const f of data.files || []) {
       const id = newId('file');
-      await putFile(id, f);
-      attachments.push({ id, name: f.name, size: f.size, type: f.type });
+      if (REMOTE) {
+        const path = `${pubId}/${id}-${safeName(f.name)}`;
+        await uploadFile(path, f);
+        attachments.push({ id, name: f.name, size: f.size, type: f.type, path });
+      } else {
+        await putFile(id, f);
+        attachments.push({ id, name: f.name, size: f.size, type: f.type });
+      }
     }
     const newPub: Publication = {
       attachments,
-      id: newId('pub'),
+      id: pubId,
       title: data.title.trim(),
       description: data.description.trim(),
       category: data.category,
@@ -625,7 +794,9 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const deletePublication = (pubId: string) => {
     const dp = publications.find((p) => p.id === pubId);
     if (dp) log('publicacion_eliminada', `Eliminó "${dp.title}" de ${dp.author.name}`);
-    publications.find((p) => p.id === pubId)?.attachments?.forEach((a) => deleteFile(a.id));
+    const atts = publications.find((p) => p.id === pubId)?.attachments || [];
+    atts.forEach((a) => deleteFile(a.id));
+    if (REMOTE) removeFiles(atts.map((a) => a.path).filter(Boolean) as string[]);
     setPublications((prev) => prev.filter((p) => p.id !== pubId));
     setSelectedPublicationState((prev) => (prev?.id === pubId ? null : prev));
   };
@@ -834,6 +1005,8 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         libraryRatings,
         activity,
         rateLibraryResource,
+        syncStatus,
+        syncError,
       }}
     >
       {children}
