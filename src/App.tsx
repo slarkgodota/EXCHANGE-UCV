@@ -14,6 +14,7 @@ import { AuthModal } from './components/AuthModal';
 import { LibrarySection } from './components/LibrarySection';
 import { CampusSection } from './components/CampusSection';
 import { Footer } from './components/Footer';
+import { ThemeToggle } from './components/ThemeToggle';
 import { filterPublications } from './utils/exchangeLogic';
 import { useView, goTo } from './utils/router';
 import { BookOpen, Plus, WifiOff } from 'lucide-react';
@@ -134,6 +135,7 @@ const ExchangePortal: React.FC = () => {
       <AdminPanelModal />
       <ProjectInfoModal />
       <AuthModal />
+      <ThemeToggle />
     </div>
   );
 };
