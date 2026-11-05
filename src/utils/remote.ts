@@ -21,9 +21,11 @@ export const isRemoteEnabled = (): boolean => Boolean(URL_BASE && KEY);
 
 export const BUCKET = 'adjuntos';
 
-const headers = (extra: Record<string, string> = {}) => ({
+// Las claves nuevas (sb_publishable_…) no son JWT: van solo en "apikey".
+// Las claves antiguas (eyJ…) se envían también como Authorization.
+const headers = (extra: Record<string, string> = {}): Record<string, string> => ({
   apikey: KEY,
-  Authorization: `Bearer ${KEY}`,
+  ...(KEY.startsWith('eyJ') ? { Authorization: `Bearer ${KEY}` } : {}),
   ...extra,
 });
 

@@ -415,9 +415,11 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         applyRemote(rows, initial || !loadedRef.current);
         loadedRef.current = true;
         setSyncStatus('online');
-      } catch (e) {
+      } catch (e: any) {
         console.warn('No se pudo leer la base de datos', e);
-        if (alive) setSyncStatus(loadedRef.current ? 'online' : 'error');
+        if (!alive) return;
+        setSyncStatus(loadedRef.current ? 'online' : 'error');
+        if (!loadedRef.current) setSyncError(`No se pudo conectar con la base de datos: ${e?.message || e}`);
       }
     };
     pull(true);

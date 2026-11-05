@@ -1,8 +1,7 @@
 // Configuración de la base de datos compartida (Supabase).
-// Pega aquí los datos de tu proyecto: Supabase → Project Settings → API.
-// Usa SOLO la clave "anon public". Nunca pongas la clave "service_role".
-// Si los dejas vacíos, la página guarda todo solo en el navegador de cada persona.
+// Supabase → Project Settings → API. Usa SOLO la clave pública (publishable / anon).
+// Nunca pongas aquí la clave "service_role" ni la clave secreta.
 window.EXCHANGE_CONFIG = {
-  supabaseUrl: '',
-  supabaseAnonKey: '',
+  supabaseUrl: 'https://gunidbodtkfzzkymfauu.supabase.co',
+  supabaseAnonKey: 'sb_publishable_b5XIebqq5F4xTq-Jj1MXRA_9CnFCOIx',
 };
