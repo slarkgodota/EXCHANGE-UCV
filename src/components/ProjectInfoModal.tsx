@@ -65,68 +65,36 @@ export const ProjectInfoModal: React.FC = () => {
               Equipo de Autores e Investigadores:
             </h5>
             <div className="space-y-2">
-              <div className="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
-                <div>
-                  <strong className="text-slate-900 block">DELGADO CERDÁN, Michael Jefferson</strong>
-                  <span className="text-slate-500 text-[11px]">Estudiante de Ingeniería Civil</span>
-                </div>
-                <a
-                  href="https://orcid.org/0009-0004-9087-2490"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-emerald-700 font-semibold inline-flex items-center gap-1 hover:underline text-[11px]"
-                >
-                  orcid.org/0009-0004-9087-2490
-                  <ExternalLink className="w-3 h-3" />
+              <div className="p-3 bg-white rounded-xl border border-slate-200">
+                <strong className="text-slate-900">DELGADO CERDÁN, Michael Jefferson</strong>{' '}
+                <a href="https://orcid.org/0009-0004-9087-2490" target="_blank" rel="noopener noreferrer" className="text-emerald-700 font-semibold hover:underline text-[11px] whitespace-nowrap">
+                  (orcid.org/0009-0004-9087-2490)
                 </a>
+                <span className="block"><span className="text-slate-500 text-[11px]">Estudiante de Ingeniería Civil</span></span>
               </div>
 
-              <div className="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
-                <div>
-                  <strong className="text-slate-900 block">GONZALEZ GUEVARA, José Roly</strong>
-                  <span className="text-slate-500 text-[11px]">Estudiante de Ingeniería Civil</span>
-                </div>
-                <a
-                  href="https://orcid.org/0009-0008-6874-4045"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-emerald-700 font-semibold inline-flex items-center gap-1 hover:underline text-[11px]"
-                >
-                  orcid.org/0009-0008-6874-4045
-                  <ExternalLink className="w-3 h-3" />
+              <div className="p-3 bg-white rounded-xl border border-slate-200">
+                <strong className="text-slate-900">GONZALEZ GUEVARA, José Roly</strong>{' '}
+                <a href="https://orcid.org/0009-0008-6874-4045" target="_blank" rel="noopener noreferrer" className="text-emerald-700 font-semibold hover:underline text-[11px] whitespace-nowrap">
+                  (orcid.org/0009-0008-6874-4045)
                 </a>
+                <span className="block"><span className="text-slate-500 text-[11px]">Estudiante de Ingeniería Civil</span></span>
               </div>
 
-              <div className="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
-                <div>
-                  <strong className="text-slate-900 block">GRANDEZ ACOSTA, Michael Cristofer</strong>
-                  <span className="text-slate-500 text-[11px]">Estudiante de Ingeniería Civil</span>
-                </div>
-                <a
-                  href="https://orcid.org/0009-0004-9770-9557"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-emerald-700 font-semibold inline-flex items-center gap-1 hover:underline text-[11px]"
-                >
-                  orcid.org/0009-0004-9770-9557
-                  <ExternalLink className="w-3 h-3" />
+              <div className="p-3 bg-white rounded-xl border border-slate-200">
+                <strong className="text-slate-900">GRANDEZ ACOSTA, Michael Cristofer</strong>{' '}
+                <a href="https://orcid.org/0009-0004-9770-9557" target="_blank" rel="noopener noreferrer" className="text-emerald-700 font-semibold hover:underline text-[11px] whitespace-nowrap">
+                  (orcid.org/0009-0004-9770-9557)
                 </a>
+                <span className="block"><span className="text-slate-500 text-[11px]">Estudiante de Ingeniería Civil</span></span>
               </div>
 
-              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-center justify-between">
-                <div>
-                  <strong className="text-amber-950 block">Docente Asesor: Ing. Alex Tongo Silva</strong>
-                  <span className="text-amber-800 text-[11px]">Docente del curso</span>
-                </div>
-                <a
-                  href="https://orcid.org/0000-0001-5503-3692"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-emerald-800 font-semibold inline-flex items-center gap-1 hover:underline text-[11px]"
-                >
-                  orcid.org/0000-0001-5503-3692
-                  <ExternalLink className="w-3 h-3" />
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200">
+                <strong className="text-amber-950">Docente Asesor: Ing. Alex Tongo Silva</strong>{' '}
+                <a href="https://orcid.org/0000-0001-5503-3692" target="_blank" rel="noopener noreferrer" className="text-emerald-700 font-semibold hover:underline text-[11px] whitespace-nowrap">
+                  (orcid.org/0000-0001-5503-3692)
                 </a>
+                <span className="block"><span className="text-amber-800 text-[11px]">Docente del curso</span></span>
               </div>
             </div>
           </div>

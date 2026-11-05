@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useExchange } from '../context/ExchangeContext';
 import { getCampusLabel } from '../data/ucv';
+import { OrcidFor } from './Orcid';
 
 export const RequestsDrawer: React.FC = () => {
   const {
@@ -161,7 +162,8 @@ export const RequestsDrawer: React.FC = () => {
                 <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/70 text-xs space-y-1">
                   <div className="flex items-center justify-between text-slate-700">
                     <span className="font-semibold">
-                      {activeTab === 'recibidas' ? req.senderName : req.receiverName}
+                      {activeTab === 'recibidas' ? req.senderName : req.receiverName}{' '}
+                      <OrcidFor userId={activeTab === 'recibidas' ? req.senderId : req.receiverId} />
                     </span>
                     <span className="text-[10px] text-slate-500">
                       {getCampusLabel(req.senderCampus)}

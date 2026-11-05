@@ -6,6 +6,7 @@ import { Avatar } from './Avatar';
 import { StarDisplay } from './StarRating';
 import { getCampusLabel } from '../data/ucv';
 import { INTENT_LABELS } from '../data/catalog';
+import { Orcid } from './Orcid';
 
 const CAT = {
   materiales: { label: 'Materiales', cls: 'bg-red-50 text-red-700' },
@@ -59,6 +60,7 @@ export const PublicationCard: React.FC<{ publication: Publication; index?: numbe
               {p.author.name}
               {p.author.verified && <BadgeCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
             </p>
+            <Orcid orcid={p.author.orcid} className="block" />
             <p className="text-[11px] text-slate-500 truncate">{getCampusLabel(p.author.campus)}</p>
           </div>
         </div>

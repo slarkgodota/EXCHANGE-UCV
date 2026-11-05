@@ -8,6 +8,7 @@ import { CareerType, CampusType, RolePermission } from '../types/exchange';
 import { CAREERS, UCV_CAMPUSES, getCampusLabel } from '../data/ucv';
 import { Avatar } from './Avatar';
 import { StarDisplay } from './StarRating';
+import { Orcid, OrcidFor } from './Orcid';
 
 type Tab = 'resumen' | 'usuarios' | 'historial' | 'publicaciones' | 'reportes' | 'roles';
 
@@ -318,7 +319,7 @@ export const AdminPanelModal: React.FC = () => {
                     {recent.map((u) => (
                       <li key={u.id} className="flex items-center gap-2 text-sm">
                         <Avatar name={u.name} src={u.avatar} size="xs" />
-                        <span className="truncate flex-1">{u.name}</span>
+                        <span className="truncate flex-1">{u.name} <Orcid orcid={u.orcid} /></span>
                         <span className="text-xs text-slate-400 tabular-nums">{u.createdAt || 'inicial'}</span>
                       </li>
                     ))}
@@ -404,9 +405,10 @@ export const AdminPanelModal: React.FC = () => {
                             <div className="flex items-center gap-3">
                               <Avatar name={u.name} src={u.avatar} size="sm" />
                               <div className="min-w-0">
-                                <p className="font-semibold text-slate-900 flex items-center gap-1">
+                                <p className="font-semibold text-slate-900 flex items-center gap-1 flex-wrap">
                                   {u.name}
                                   {u.verified && <BadgeCheck className="w-3.5 h-3.5 text-blue-600" />}
+                                  <Orcid orcid={u.orcid} />
                                 </p>
                                 <p className="text-xs text-slate-500">
                                   {u.email}
@@ -513,7 +515,7 @@ export const AdminPanelModal: React.FC = () => {
                             <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${ACTIVITY_TONE[a.type] || 'bg-slate-100 text-slate-700'}`}>{ACTIVITY_LABELS[a.type]}</span>
                           </td>
                           <td className="px-4 py-3">
-                            <p className="font-semibold text-slate-900">{a.actorName}</p>
+                            <p className="font-semibold text-slate-900">{a.actorName} <OrcidFor email={a.actorEmail} /></p>
                             <p className="text-xs text-slate-500">{a.actorEmail}</p>
                           </td>
                           <td className="px-4 py-3 text-slate-700">{a.detail}</td>
@@ -538,7 +540,7 @@ export const AdminPanelModal: React.FC = () => {
                       {p.status === 'reportado' && <span className="ml-2 text-[11px] text-red-600">(oculta)</span>}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {p.author.name} · {p.course} · {p.createdAt}
+                      {p.author.name} <Orcid orcid={p.author.orcid} /> · {p.course} · {p.createdAt}
                     </p>
                     <div className="mt-1">
                       <StarDisplay value={p.ratingAverage} count={p.ratingCount} />

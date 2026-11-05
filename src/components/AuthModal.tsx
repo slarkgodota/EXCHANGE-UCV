@@ -22,6 +22,7 @@ import { useExchange, AuthMode } from '../context/ExchangeContext';
 import { CAREERS, UCV_CAMPUSES } from '../data/ucv';
 import { CareerType, CampusType } from '../types/exchange';
 import { Avatar } from './Avatar';
+import { Orcid, isValidOrcid } from './Orcid';
 
 const CYCLES = ['Ciclo I', 'Ciclo II', 'Ciclo III', 'Ciclo IV', 'Ciclo V', 'Ciclo VI', 'Ciclo VII', 'Ciclo VIII', 'Ciclo IX', 'Ciclo X', 'Egresado', 'Docente'];
 
@@ -295,6 +296,7 @@ const AccountPanel: React.FC = () => {
             {currentUser.verified && <BadgeCheck className="w-4 h-4 text-blue-600 shrink-0" aria-label="Cuenta verificada" />}
           </div>
           <p className="text-xs text-slate-500 truncate">{currentUser.email}</p>
+          <Orcid orcid={currentUser.orcid} />
           <p className="text-[11px] text-red-700 font-semibold mt-0.5">{getRoleById(currentUser.role).name}</p>
         </div>
       </div>
@@ -321,6 +323,21 @@ const AccountPanel: React.FC = () => {
           </select>
         </label>
       </div>
+
+      <label className="block text-xs">
+        <span className={labelBase}>ORCID <span className="font-normal text-slate-400">(opcional)</span></span>
+        <input
+          id="acc-orcid"
+          defaultValue={currentUser.orcid || ''}
+          placeholder="0000-0000-0000-0000"
+          onBlur={(e) => {
+            const v = e.target.value.trim().replace(/^https?:\/\/(www\.)?orcid\.org\//, '');
+            if (v === '' || isValidOrcid(v)) updateProfile({ orcid: v || undefined });
+            else e.target.value = currentUser.orcid || '';
+          }}
+          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
+        />
+      </label>
 
       <form onSubmit={submit} className="space-y-3 pt-4 border-t border-slate-100">
         <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">

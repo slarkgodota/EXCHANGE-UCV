@@ -26,6 +26,7 @@ import { calculateRatingDistribution, isSafeHttpUrl } from '../utils/exchangeLog
 import { Avatar } from './Avatar';
 import { AttachmentList } from './AttachmentList';
 import { getCampusLabel } from '../data/ucv';
+import { Orcid, OrcidFor } from './Orcid';
 
 export const PublicationDetailModal: React.FC = () => {
   const {
@@ -345,6 +346,7 @@ export const PublicationDetailModal: React.FC = () => {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <h4 className="font-bold text-slate-900 text-base">{pub.author.name}</h4>
+                    <Orcid orcid={pub.author.orcid} />
                     {pub.author.verified && (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full">
                         <BadgeCheck className="w-3.5 h-3.5" /> Cuenta verificada
@@ -358,7 +360,7 @@ export const PublicationDetailModal: React.FC = () => {
                 </div>
               </div>
 
-              {pub.author.orcid && (
+              {false && pub.author.orcid && (
                 <a
                   href={`https://orcid.org/${pub.author.orcid}`}
                   target="_blank"
@@ -547,6 +549,7 @@ export const PublicationDetailModal: React.FC = () => {
                             <span className="text-xs font-bold text-slate-800">
                               {rev.authorName}
                             </span>
+                            <OrcidFor userId={rev.authorId} />
                             {rev.verifiedExchange && (
                               <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-medium border border-emerald-200">
                                 Tras un intercambio
