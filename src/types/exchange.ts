@@ -93,6 +93,8 @@ export interface Publication {
   resourceUrl?: string;
   downloadCount: number;
   createdAt: string;
+  /** Fecha de la última edición del autor. */
+  updatedAt?: string;
   status: 'aprobado' | 'en_revision' | 'destacado' | 'reportado';
   ratingAverage: number;
   ratingCount: number;

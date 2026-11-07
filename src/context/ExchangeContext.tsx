@@ -13,6 +13,7 @@ import {
   CampusType,
   AIOriginalityAuditResult,
   RoleDefinition,
+  AttachmentMeta,
 } from '../types/exchange';
 import {
   INITIAL_USERS,
@@ -116,6 +117,12 @@ interface ExchangeContextType {
   isOwner: boolean;
 
   addPublication: (data: NewPublicationInput) => Promise<Publication | null>;
+  /** Publicación que se está editando (abre el mismo formulario de publicar). */
+  editingPublication: Publication | null;
+  startEditPublication: (pub: Publication) => void;
+  cancelEditPublication: () => void;
+  canEditPublication: (pub: Publication) => boolean;
+  updatePublication: (pubId: string, data: NewPublicationInput & { keepAttachmentIds: string[] }) => Promise<Publication | null>;
   /** ¿Puede el usuario actual descargar los adjuntos? (gratuito, o intercambio aceptado) */
   canDownload: (pub: Publication) => { allowed: boolean; reason?: 'login' | 'request' | 'pending' };
   auditPublicationWithAI: (data: {
@@ -208,6 +215,7 @@ export type ActivityType =
   | 'cierre_sesion'
   | 'publicacion'
   | 'publicacion_eliminada'
+  | 'publicacion_editada'
   | 'resena'
   | 'solicitud'
   | 'solicitud_respondida'
@@ -444,6 +452,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [filter, setFilter] = useState<FilterState>(DEFAULT_FILTER);
   const [selectedPublication, setSelectedPublicationState] = useState<Publication | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingPublication, setEditingPublication] = useState<Publication | null>(null);
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [isRequestsDrawerOpen, setIsRequestsDrawerOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
@@ -787,6 +796,72 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return newPub;
   };
 
+  const canEditPublication = (pub: Publication) =>
+    Boolean(currentUser && (pub.author.id === currentUser.id || isCreatorOrAdmin));
+
+  const startEditPublication = (pub: Publication) => {
+    if (!canEditPublication(pub)) return;
+    setEditingPublication(pub);
+    setSelectedPublicationState(null);
+    setIsCreateModalOpen(true);
+  };
+
+  const cancelEditPublication = () => {
+    setEditingPublication(null);
+    setIsCreateModalOpen(false);
+  };
+
+  const updatePublication = async (
+    pubId: string,
+    data: NewPublicationInput & { keepAttachmentIds: string[] }
+  ): Promise<Publication | null> => {
+    const old = publications.find((p) => p.id === pubId);
+    if (!old || !canEditPublication(old)) return null;
+    const kept = (old.attachments || []).filter((a) => data.keepAttachmentIds.includes(a.id));
+    const removed = (old.attachments || []).filter((a) => !data.keepAttachmentIds.includes(a.id));
+    const added: AttachmentMeta[] = [];
+    for (const f of data.files || []) {
+      const id = newId('file');
+      if (REMOTE) {
+        const path = `${pubId}/${id}-${safeName(f.name)}`;
+        await uploadFile(path, f);
+        added.push({ id, name: f.name, size: f.size, type: f.type, path });
+      } else {
+        await putFile(id, f);
+        added.push({ id, name: f.name, size: f.size, type: f.type });
+      }
+    }
+    removed.forEach((a) => deleteFile(a.id));
+    if (REMOTE && removed.length) removeFiles(removed.map((a) => a.path).filter(Boolean) as string[]);
+    const updated: Publication = {
+      ...old,
+      title: data.title.trim(),
+      description: data.description.trim(),
+      category: data.category,
+      career: data.career,
+      course: data.course.trim(),
+      cycleLevel: data.cycleLevel,
+      tags: data.tags,
+      exchangeType: data.exchangeType,
+      fileType: data.fileType,
+      intent: data.intent,
+      resourceType: data.resourceType,
+      resourceUrl: data.resourceUrl?.trim() || undefined,
+      attachments: [...kept, ...added],
+      updatedAt: today(),
+    };
+    setPublications((prev) => prev.map((p) => (p.id === pubId ? updated : p)));
+    const changes: string[] = [];
+    if (old.title !== updated.title) changes.push('título');
+    if (old.description !== updated.description) changes.push('descripción');
+    if (old.exchangeType !== updated.exchangeType) changes.push(`acceso: ${updated.exchangeType}`);
+    if (added.length) changes.push(`+${added.length} archivo(s)`);
+    if (removed.length) changes.push(`-${removed.length} archivo(s)`);
+    log('publicacion_editada', `Editó "${updated.title}"${changes.length ? ` (${changes.join(', ')})` : ''}`);
+    setEditingPublication(null);
+    return updated;
+  };
+
   const updatePublicationStatus = (pubId: string, status: Publication['status']) => {
     const up = publications.find((p) => p.id === pubId);
     if (up && up.status !== status) log('moderacion', `"${up.title}": ${up.status} → ${status}`);
@@ -983,6 +1058,11 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         isCreatorOrAdmin,
         isOwner,
         addPublication,
+        editingPublication,
+        startEditPublication,
+        cancelEditPublication,
+        canEditPublication,
+        updatePublication,
         canDownload,
         auditPublicationWithAI,
         runAIAuditOnPublication,

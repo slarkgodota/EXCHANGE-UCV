@@ -19,7 +19,8 @@ Prototipo estudiantil para que estudiantes de la **Universidad César Vallejo** 
 | **Sedes UCV** | Los 12 campus oficiales y los horarios de sus bibliotecas (fuente: ucv.edu.pe). Editable en `src/data/ucv.ts`. |
 | **Solicitudes** | El contacto (correo / celular) solo se muestra cuando se acepta la solicitud. |
 | **Panel de administración** | Usuarios, roles, moderación y reportes. Solo para cuentas con permisos. |
-| **Archivos adjuntos** | Al publicar se pueden subir hasta 3 archivos (PDF, imágenes, Word, PowerPoint, Excel, ZIP; 10 MB c/u). Si es **Gratis**, cualquier usuario registrado descarga; si es **Intercambio**, se desbloquea cuando el autor acepta la solicitud. Se guardan en IndexedDB del navegador. |
+| **Archivos adjuntos** | Al publicar se pueden subir hasta 3 archivos (PDF, imágenes, Word, PowerPoint, Excel, ZIP; 10 MB c/u). Si es **Gratis**, cualquier usuario registrado los ve y descarga. Si es **Intercambio** o **Equipo**, todos pueden **verlos en vista previa** (PDF página por página, imágenes y texto, con marca de agua y sin botón de descarga) y la **descarga** se habilita cuando el autor acepta la solicitud. Se guardan en Supabase Storage (o en IndexedDB si no hay base de datos). |
+| **Editar publicaciones** | El autor (y los administradores) tienen el botón **Editar publicación** en el detalle: se abre el mismo formulario con los datos cargados, se pueden quitar o agregar archivos, y queda la marca "editado el …" y el registro en el historial del admin. |
 | **Declaración de responsabilidad** | Antes de publicar, la persona acepta que es responsable de su contenido (autoría, citas, sin exámenes copiados, datos verídicos). |
 
 ## Ejecutar en tu PC
@@ -85,3 +86,5 @@ server.ts              Servidor Express + endpoint de auditoría con Gemini
 - Campus: https://www.ucv.edu.pe/en/campus-ucv
 - Bibliotecas y horarios: https://www.ucv.edu.pe/en/information-centers
 - Licenciamiento SUNEDU (Res. 077-2019-SUNEDU/CD): https://andina.pe/ingles/noticia-sunedu-otorga-licenciamiento-a-universidad-cesar-vallejo-norma-legal-y-graficos-755220.aspx
+
+> El visor de PDF usa [pdf.js](https://github.com/mozilla/pdf.js) (Mozilla, licencia Apache 2.0), incluido en `public/vendor/pdfjs/`.

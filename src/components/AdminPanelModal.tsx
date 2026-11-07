@@ -18,6 +18,7 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
   cierre_sesion: 'Cierre de sesión',
   publicacion: 'Publicación',
   publicacion_eliminada: 'Publicación eliminada',
+  publicacion_editada: 'Publicación editada',
   resena: 'Reseña',
   solicitud: 'Solicitud',
   solicitud_respondida: 'Respuesta a solicitud',
@@ -31,6 +32,7 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
 const ACTIVITY_TONE: Partial<Record<ActivityType, string>> = {
   registro: 'bg-emerald-100 text-emerald-800',
   publicacion: 'bg-blue-100 text-blue-800',
+  publicacion_editada: 'bg-sky-100 text-sky-800',
   reporte: 'bg-red-100 text-red-700',
   cuenta_eliminada: 'bg-red-100 text-red-700',
   publicacion_eliminada: 'bg-red-100 text-red-700',

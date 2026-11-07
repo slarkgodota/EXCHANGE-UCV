@@ -20,6 +20,8 @@ import {
   Brain,
   Loader2,
   ShieldCheck,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { useExchange } from '../context/ExchangeContext';
 import { calculateRatingDistribution, isSafeHttpUrl } from '../utils/exchangeLogic';
@@ -42,6 +44,8 @@ export const PublicationDetailModal: React.FC = () => {
     isCreatorOrAdmin,
     deletePublication,
     canDownload,
+    canEditPublication,
+    startEditPublication,
   } = useExchange();
 
   const [ratingInput, setRatingInput] = useState<number>(5);
@@ -255,6 +259,7 @@ export const PublicationDetailModal: React.FC = () => {
               <span className="flex items-center gap-1">
                 <Calendar className="w-4 h-4 text-slate-400" />
                 Publicado el: <span className="text-slate-800 ml-1">{pub.createdAt}</span>
+                {pub.updatedAt && <span className="ml-1 text-[11px] font-semibold text-sky-700">(editado el {pub.updatedAt})</span>}
               </span>
               <span>•</span>
               <span className="flex items-center gap-1">
@@ -316,7 +321,17 @@ export const PublicationDetailModal: React.FC = () => {
               )}
             </div>
             {(isMine || isCreatorOrAdmin) && (
-              <div className="flex justify-end">
+              <div className="flex flex-wrap justify-end gap-2">
+                {canEditPublication(pub) && (
+                  <button
+                    type="button"
+                    onClick={() => startEditPublication(pub)}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-red-600 transition"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Editar publicación
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {
@@ -326,8 +341,9 @@ export const PublicationDetailModal: React.FC = () => {
                       setTimeout(() => setConfirmDelete(false), 4000);
                     }
                   }}
-                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg ${confirmDelete ? 'bg-red-600 text-white' : 'text-red-600 hover:bg-red-50'}`}
+                  className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg ${confirmDelete ? 'bg-red-600 text-white' : 'text-red-600 hover:bg-red-50'}`}
                 >
+                  <Trash2 className="w-3.5 h-3.5" />
                   {confirmDelete ? 'Toca de nuevo para eliminar' : 'Eliminar publicación'}
                 </button>
               </div>
