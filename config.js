@@ -4,4 +4,7 @@
 window.EXCHANGE_CONFIG = {
   supabaseUrl: 'https://gunidbodtkfzzkymfauu.supabase.co',
   supabaseAnonKey: 'sb_publishable_b5XIebqq5F4xTq-Jj1MXRA_9CnFCOIx',
+  // Visor de PDF (pdf.js) incluido en la página para la vista previa de archivos.
+  pdfjsUrl: 'vendor/pdfjs/pdf.mjs',
+  pdfjsWorkerUrl: 'vendor/pdfjs/pdf.worker.mjs',
 };
