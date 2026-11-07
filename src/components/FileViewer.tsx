@@ -11,8 +11,16 @@ export const canPreview = (name: string) => {
   return e === 'pdf' || IMAGE_EXT.includes(e) || TEXT_EXT.includes(e);
 };
 
-/** Hojas que se ven claras cuando el archivo es por intercambio y aún no se aceptó la solicitud. */
-export const CLEAR_PAGES = 2;
+/**
+ * Cuántas hojas se ven claras en intercambio (sin solicitud aceptada), según el tamaño del PDF:
+ * 1 hoja → solo la parte de arriba · 2–4 → 1 hoja · 5–10 → 2 hojas · más de 10 → 3 hojas.
+ */
+export function clearPagesFor(total: number): number {
+  if (total <= 1) return 0;
+  if (total <= 4) return 1;
+  if (total <= 10) return 2;
+  return 3;
+}
 /** Hojas borrosas que se muestran después de las claras (el resto solo se cuenta). */
 const BLURRED_PAGES_SHOWN = 3;
 /** En una imagen o un PDF de 1 hoja, qué parte de arriba se ve clara. */
@@ -97,9 +105,9 @@ const PdfPages: React.FC<{ blob: Blob; limited: boolean; onError: (m: string) =>
         doc = await pdfjs.getDocument({ data, isEvalSupported: false }).promise;
         const n = doc.numPages as number;
         setTotal(n);
-        // Con intercambio sin aceptar: 1–2 hojas claras + unas pocas borrosas.
-        const clear = limited ? Math.min(CLEAR_PAGES, n) : Math.min(n, MAX_PREVIEW_PAGES);
-        const count = limited ? Math.min(n, clear + BLURRED_PAGES_SHOWN) : clear;
+        // Con intercambio sin aceptar: 1–3 hojas claras según el tamaño + unas pocas borrosas.
+        const clear = limited ? clearPagesFor(n) : Math.min(n, MAX_PREVIEW_PAGES);
+        const count = limited ? Math.min(n, Math.max(1, clear + BLURRED_PAGES_SHOWN)) : clear;
         setToRender(count);
         const width = Math.min((box.current?.clientWidth || 800) - 8, 1000);
         const ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -107,7 +115,7 @@ const PdfPages: React.FC<{ blob: Blob; limited: boolean; onError: (m: string) =>
           if (cancelled) return;
           const page = await doc.getPage(i);
           const base = page.getViewport({ scale: 1 });
-          const locked = limited && i > clear;
+          const locked = limited && clear > 0 && i > clear;
           // Las hojas bloqueadas se dibujan a muy baja resolución: aunque alguien quite el borroso, no hay nada legible.
           const scale = locked ? (90 / base.width) : (width / base.width) * ratio;
           const vp = page.getViewport({ scale });
@@ -124,7 +132,7 @@ const PdfPages: React.FC<{ blob: Blob; limited: boolean; onError: (m: string) =>
             const ctx = out.getContext('2d')!;
             ctx.filter = 'blur(12px)';
             ctx.drawImage(canvas, 0, 0, out.width, out.height);
-          } else if (limited && n === 1) {
+          } else if (limited && clear === 0) {
             // Un PDF de una sola hoja: se ve la parte de arriba y el resto censurado.
             censor(canvas, Math.round(canvas.height * CLEAR_FRACTION));
             partial = true;
@@ -148,13 +156,16 @@ const PdfPages: React.FC<{ blob: Blob; limited: boolean; onError: (m: string) =>
   }, [blob, limited]);
 
   const shownClear = pages.filter((p) => !p.locked).length;
-  const hiddenRest = total !== null && limited ? total - Math.min(total, CLEAR_PAGES + BLURRED_PAGES_SHOWN) : 0;
+  const clearCount = total !== null ? clearPagesFor(total) : 0;
+  const hiddenRest = total !== null && limited ? total - Math.min(total, Math.max(1, clearCount + BLURRED_PAGES_SHOWN)) : 0;
 
   return (
     <div ref={box}>
-      {limited && total !== null && total > 1 && (
+      {limited && total !== null && (
         <p className="mb-3 text-center text-xs font-semibold text-amber-200">
-          Vista previa: se ven {Math.min(CLEAR_PAGES, total)} de {total} hojas. El resto está bloqueado hasta que el autor acepte el intercambio.
+          {clearCount === 0
+            ? 'Vista previa: solo se ve la parte de arriba de la hoja. El resto está bloqueado hasta que el autor acepte el intercambio.'
+            : `Vista previa: se ${clearCount === 1 ? 've 1 hoja' : `ven ${clearCount} hojas`} de ${total}. El resto está bloqueado hasta que el autor acepte el intercambio.`}
         </p>
       )}
       <div className="flex flex-col gap-4 items-stretch">
@@ -269,15 +280,18 @@ const TextSplit: React.FC<{ visible: string[]; hidden: string[]; more?: number }
 export const FileViewer: React.FC<{
   file: AttachmentMeta;
   allowDownload: boolean;
+  /** Si ve todo por ser autor o administrador de una publicación de intercambio. */
+  privileged?: 'autor' | 'administrador' | null;
   onClose: () => void;
   onDownloaded?: () => void;
-}> = ({ file, allowDownload, onClose, onDownloaded }) => {
+}> = ({ file, allowDownload, privileged = null, onClose, onDownloaded }) => {
+  const [asVisitor, setAsVisitor] = useState(false);
   const [blob, setBlob] = useState<Blob | null>(null);
   const [text, setText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const ext = extensionOf(file.name);
-  const viewOnly = !allowDownload;
+  const viewOnly = !allowDownload || asVisitor;
 
   useEffect(() => {
     let alive = true;
@@ -296,7 +310,7 @@ export const FileViewer: React.FC<{
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
       // Evita Ctrl+S / Ctrl+P mientras se ve un archivo que no se puede descargar.
-      if (viewOnly && (e.ctrlKey || e.metaKey) && ['s', 'p'].includes(e.key.toLowerCase())) e.preventDefault();
+      if (!allowDownload && (e.ctrlKey || e.metaKey) && ['s', 'p'].includes(e.key.toLowerCase())) e.preventDefault();
     };
     window.addEventListener('keydown', onKey);
     return () => {
@@ -329,6 +343,15 @@ export const FileViewer: React.FC<{
             {formatBytes(file.size)} · {viewOnly ? 'Vista previa parcial' : 'Puedes descargar este archivo'}
           </p>
         </div>
+        {privileged && (
+          <button
+            type="button"
+            onClick={() => setAsVisitor((v) => !v)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full border border-white/30 hover:bg-white/10 text-[11px] font-bold"
+          >
+            <Eye className="w-3.5 h-3.5" /> {asVisitor ? 'Ver completo' : 'Ver como los demás'}
+          </button>
+        )}
         {viewOnly ? (
           <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-300">
             <Lock className="w-3.5 h-3.5" /> Completo y descarga al aceptar el intercambio
@@ -349,6 +372,13 @@ export const FileViewer: React.FC<{
         </button>
       </div>
 
+      {privileged && (
+        <p className={`px-4 py-2 text-center text-xs font-semibold ${asVisitor ? 'bg-amber-400 text-amber-950' : 'bg-sky-700 text-white'}`}>
+          {asVisitor
+            ? 'Así ven tu archivo los demás usuarios mientras no aceptes su solicitud de intercambio.'
+            : `Ves el archivo completo porque eres ${privileged === 'autor' ? 'el autor' : 'administrador'}. Los demás solo ven una parte hasta que aceptes su solicitud.`}
+        </p>
+      )}
       <div className="flex-1 overflow-y-auto p-3 sm:p-6" onClick={(e) => e.target === e.currentTarget && onClose()}>
         <div
           className={`relative mx-auto max-w-4xl ${viewOnly ? 'select-none' : ''}`}
@@ -365,9 +395,9 @@ export const FileViewer: React.FC<{
               <Loader2 className="w-4 h-4 animate-spin" /> Abriendo archivo…
             </p>
           ) : ext === 'pdf' ? (
-            <PdfPages blob={blob} limited={viewOnly} onError={setError} />
+            <PdfPages key={String(viewOnly)} blob={blob} limited={viewOnly} onError={setError} />
           ) : IMAGE_EXT.includes(ext) ? (
-            <ImagePreview blob={blob} limited={viewOnly} name={file.name} onError={setError} />
+            <ImagePreview key={String(viewOnly)} blob={blob} limited={viewOnly} name={file.name} onError={setError} />
           ) : text !== null ? (
             <TextPreview text={text} limited={viewOnly} />
           ) : (

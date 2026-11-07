@@ -37,7 +37,7 @@ const Thumb: React.FC<{ id: string; name: string; path?: string }> = ({ id, name
  *   cuando el autor acepta su solicitud.
  */
 export const AttachmentList: React.FC<{ pub: Publication; onNeedRequest: () => void }> = ({ pub, onNeedRequest }) => {
-  const { canDownload, openAuth, recordResourceOpen, isLoggedIn } = useExchange();
+  const { canDownload, openAuth, recordResourceOpen, isLoggedIn, currentUser, isCreatorOrAdmin } = useExchange();
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [viewing, setViewing] = useState<AttachmentMeta | null>(null);
@@ -46,6 +46,9 @@ export const AttachmentList: React.FC<{ pub: Publication; onNeedRequest: () => v
 
   const access = canDownload(pub);
   const free = pub.exchangeType === 'Gratuito / RSU';
+  const isAuthor = Boolean(currentUser && pub.author.id === currentUser.id);
+  // El autor y los administradores ven todo; se les avisa para que no se confundan.
+  const privileged: 'autor' | 'administrador' | null = free ? null : isAuthor ? 'autor' : isCreatorOrAdmin ? 'administrador' : null;
 
   const download = async (f: AttachmentMeta) => {
     setBusy(f.id);
@@ -75,7 +78,7 @@ export const AttachmentList: React.FC<{ pub: Publication; onNeedRequest: () => v
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-bold text-slate-900">Archivos ({files.length})</h3>
         <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${free ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>
-          {free ? 'Descarga gratuita' : access.allowed ? 'Intercambio aceptado' : 'Vista previa parcial · intercambio'}
+          {free ? 'Descarga gratuita' : privileged ? 'Intercambio · tú ves todo' : access.allowed ? 'Intercambio aceptado' : 'Vista previa parcial · intercambio'}
         </span>
       </div>
 
@@ -124,11 +127,16 @@ export const AttachmentList: React.FC<{ pub: Publication; onNeedRequest: () => v
         ))}
       </ul>
 
+      {privileged && (
+        <p className="p-3 rounded-xl bg-sky-50 border border-sky-200 text-xs text-sky-900">
+          Como {privileged === 'autor' ? 'autor' : 'administrador'} ves y descargas todo. Los demás solo ven las primeras hojas (el resto borroso) y no pueden descargar hasta que aceptes su solicitud. Usa <b>Ver → Ver como los demás</b> para comprobarlo.
+        </p>
+      )}
       {!access.allowed && (
         <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex flex-wrap items-center justify-between gap-2">
           <span>
             {access.reason === 'login' && 'Inicia sesión para ver estos archivos.'}
-            {access.reason === 'request' && 'Puedes ver las primeras hojas en vista previa; el resto está bloqueado. Para ver todo y descargar, envía una solicitud de intercambio y espera a que el autor la acepte.'}
+            {access.reason === 'request' && 'Puedes ver solo las primeras hojas en vista previa; el resto está borroso y bloqueado. Para ver todo y descargar, envía una solicitud de intercambio y espera a que el autor la acepte.'}
             {access.reason === 'pending' && 'Puedes ver las primeras hojas en vista previa. Tu solicitud está pendiente: podrás ver todo y descargar cuando el autor la acepte.'}
           </span>
           {access.reason === 'login' && (
@@ -145,6 +153,7 @@ export const AttachmentList: React.FC<{ pub: Publication; onNeedRequest: () => v
         <FileViewer
           file={viewing}
           allowDownload={access.allowed}
+          privileged={privileged}
           onClose={() => setViewing(null)}
           onDownloaded={() => recordResourceOpen(pub.id)}
         />
