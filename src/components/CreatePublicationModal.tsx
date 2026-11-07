@@ -23,8 +23,8 @@ import { INTENT_LABELS, RESOURCE_TYPES, DEFAULT_RESOURCE_TYPE, PublicationIntent
 
 const ACCESS_OPTIONS = [
   { value: 'Gratuito / RSU', label: 'Gratis', hint: 'Cualquier usuario registrado puede descargar.' },
-  { value: 'Intercambio Académico', label: 'Intercambio', hint: 'Pueden verlo en vista previa; se descarga cuando aceptas su solicitud.' },
-  { value: 'Colaboración en Equipo', label: 'Equipo', hint: 'Vista previa para todos; descarga solo para tu equipo.' },
+  { value: 'Intercambio Académico', label: 'Intercambio', hint: 'Ven solo las primeras hojas; todo y descarga cuando aceptas su solicitud.' },
+  { value: 'Colaboración en Equipo', label: 'Equipo', hint: 'Ven las primeras hojas; todo y descarga solo para tu equipo.' },
 ] as const;
 
 const RESPONSIBILITY_POINTS = [

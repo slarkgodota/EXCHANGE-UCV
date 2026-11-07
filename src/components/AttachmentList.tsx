@@ -75,14 +75,14 @@ export const AttachmentList: React.FC<{ pub: Publication; onNeedRequest: () => v
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-bold text-slate-900">Archivos ({files.length})</h3>
         <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${free ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>
-          {free ? 'Descarga gratuita' : 'Vista previa · descarga por intercambio'}
+          {free ? 'Descarga gratuita' : access.allowed ? 'Intercambio aceptado' : 'Vista previa parcial · intercambio'}
         </span>
       </div>
 
       <ul className="space-y-2">
         {files.map((f) => (
           <li key={f.id} className="flex flex-wrap sm:flex-nowrap items-center gap-3 p-3 rounded-2xl border border-slate-200 bg-white">
-            {isImage(f.name) && isLoggedIn ? (
+            {isImage(f.name) && access.allowed ? (
               <Thumb id={f.id} name={f.name} path={f.path} />
             ) : (
               <span className="w-12 h-12 rounded-lg bg-red-50 text-red-600 flex items-center justify-center shrink-0 text-[10px] font-black uppercase">
@@ -128,8 +128,8 @@ export const AttachmentList: React.FC<{ pub: Publication; onNeedRequest: () => v
         <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex flex-wrap items-center justify-between gap-2">
           <span>
             {access.reason === 'login' && 'Inicia sesión para ver estos archivos.'}
-            {access.reason === 'request' && 'Puedes ver los archivos en vista previa. Para descargarlos, envía una solicitud de intercambio y espera a que el autor la acepte.'}
-            {access.reason === 'pending' && 'Puedes ver los archivos en vista previa. Tu solicitud está pendiente: podrás descargarlos cuando el autor la acepte.'}
+            {access.reason === 'request' && 'Puedes ver las primeras hojas en vista previa; el resto está bloqueado. Para ver todo y descargar, envía una solicitud de intercambio y espera a que el autor la acepte.'}
+            {access.reason === 'pending' && 'Puedes ver las primeras hojas en vista previa. Tu solicitud está pendiente: podrás ver todo y descargar cuando el autor la acepte.'}
           </span>
           {access.reason === 'login' && (
             <button type="button" onClick={() => openAuth('login')} className="font-bold text-amber-950 underline">Iniciar sesión</button>
