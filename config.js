@@ -7,4 +7,6 @@ window.EXCHANGE_CONFIG = {
   // Visor de PDF (pdf.js) incluido en la página para la vista previa de archivos.
   pdfjsUrl: 'vendor/pdfjs/pdf.mjs',
   pdfjsWorkerUrl: 'vendor/pdfjs/pdf.worker.mjs',
+  // Motor 3D (three.js) para los cuartos de cada carrera.
+  threeUrl: 'vendor/three/three.module.min.js',
 };
