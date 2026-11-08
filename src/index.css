@@ -215,3 +215,10 @@ html.theme-anim, html.theme-anim * { transition: background-color 300ms ease, bo
 
 /* Modo claro: los textos de ayuda gris claro un poco más oscuros para que se lean mejor */
 html:not(.dark) .text-slate-400 { color: #6f7b90; }
+
+/* Insignia del nivel 7 (Leyenda UCV): dorada en ambos modos */
+.lvl-gold, .dark .lvl-gold { background-image: linear-gradient(90deg, #fcd34d, #fbbf24); color: #451a03; }
+/* Medallas del ranking (mismos colores en modo claro y oscuro) */
+.medal-1, .dark .medal-1 { background-color: #fbbf24; color: #451a03; }
+.medal-2, .dark .medal-2 { background-color: #cbd5e1; color: #0f172a; }
+.medal-3, .dark .medal-3 { background-color: #fdba74; color: #431407; }

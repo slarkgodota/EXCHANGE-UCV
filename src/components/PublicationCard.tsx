@@ -7,6 +7,7 @@ import { StarDisplay } from './StarRating';
 import { getCampusLabel } from '../data/ucv';
 import { INTENT_LABELS } from '../data/catalog';
 import { Orcid } from './Orcid';
+import { LevelBadge } from './LevelBadge';
 
 const CAT = {
   materiales: { label: 'Materiales', cls: 'bg-red-50 text-red-700' },
@@ -61,7 +62,10 @@ export const PublicationCard: React.FC<{ publication: Publication; index?: numbe
               {p.author.verified && <BadgeCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
             </p>
             <Orcid orcid={p.author.orcid} className="block" />
-            <p className="text-[11px] text-slate-500 truncate">{getCampusLabel(p.author.campus)}</p>
+            <p className="text-[11px] text-slate-500 truncate flex items-center gap-1.5">
+              <LevelBadge userId={p.author.id} showName={false} />
+              <span className="truncate">{getCampusLabel(p.author.campus)}</span>
+            </p>
           </div>
         </div>
         <span className="w-9 h-9 rounded-full bg-slate-100 group-hover:bg-red-600 group-hover:text-white text-slate-600 flex items-center justify-center transition shrink-0">

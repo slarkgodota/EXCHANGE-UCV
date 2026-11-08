@@ -23,6 +23,7 @@ import { CAREERS, UCV_CAMPUSES } from '../data/ucv';
 import { CareerType, CampusType } from '../types/exchange';
 import { Avatar } from './Avatar';
 import { Orcid, isValidOrcid } from './Orcid';
+import { LevelCard, LevelBadge } from './LevelBadge';
 
 const CYCLES = ['Ciclo I', 'Ciclo II', 'Ciclo III', 'Ciclo IV', 'Ciclo V', 'Ciclo VI', 'Ciclo VII', 'Ciclo VIII', 'Ciclo IX', 'Ciclo X', 'Egresado', 'Docente'];
 
@@ -297,7 +298,7 @@ const AccountPanel: React.FC = () => {
           </div>
           <p className="text-xs text-slate-500 truncate">{currentUser.email}</p>
           <Orcid orcid={currentUser.orcid} />
-          <p className="text-[11px] text-red-700 font-semibold mt-0.5">{getRoleById(currentUser.role).name}</p>
+          <p className="text-[11px] text-red-700 font-semibold mt-0.5 flex items-center gap-1.5">{getRoleById(currentUser.role).name} <LevelBadge userId={currentUser.id} /></p>
         </div>
       </div>
 
@@ -323,6 +324,8 @@ const AccountPanel: React.FC = () => {
           </select>
         </label>
       </div>
+
+      <LevelCard userId={currentUser.id} />
 
       <label className="block text-xs">
         <span className={labelBase}>ORCID <span className="font-normal text-slate-400">(opcional)</span></span>

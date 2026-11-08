@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import {
   Publication,
@@ -14,6 +14,7 @@ import {
   AIOriginalityAuditResult,
   RoleDefinition,
   AttachmentMeta,
+  ReviewReply,
 } from '../types/exchange';
 import {
   INITIAL_USERS,
@@ -24,6 +25,7 @@ import {
   ADMIN_EMAIL,
 } from '../data/initialData';
 import { calculateRatingDistribution } from '../utils/exchangeLogic';
+import { computeAllLevels, levelOf, LevelInfo } from '../utils/levels';
 import { putFile, deleteFile, clearFiles } from '../utils/fileStore';
 import { isRemoteEnabled, fetchAll, upsertRows, deleteRows, rpc, uploadFile, removeFiles, safeName, RemoteRow } from '../utils/remote';
 
@@ -138,6 +140,13 @@ interface ExchangeContextType {
   deletePublication: (pubId: string) => void;
   recordResourceOpen: (pubId: string) => void;
   addReview: (publicationId: string, rating: number, comment: string) => ActionResult;
+  /** Respuestas a los comentarios de las publicaciones. */
+  replies: ReviewReply[];
+  addReply: (publicationId: string, reviewId: string, text: string) => ActionResult;
+  deleteReply: (replyId: string) => void;
+  /** EXP y nivel de cada usuario (calculado de publicaciones, estrellas, intercambios y respuestas). */
+  userLevels: Record<string, LevelInfo>;
+  getUserLevel: (userId?: string) => LevelInfo;
   sendContactRequest: (data: {
     publicationId: string;
     publicationTitle: string;
@@ -204,6 +213,7 @@ const STORAGE_KEYS_BASE = {
   REPORTS: 'exchange_ucv_reports_v5',
   LIBRARY_RATINGS: 'exchange_ucv_library_ratings_v5',
   ACTIVITY: 'exchange_ucv_activity_v5',
+  REPLIES: 'exchange_ucv_replies_v5',
 };
 const STORAGE_KEYS = Object.fromEntries(
   Object.entries(STORAGE_KEYS_BASE).map(([k, v]) => [k, k === 'CURRENT_USER_ID' ? v : v + KEY_SUFFIX])
@@ -216,6 +226,7 @@ export type ActivityType =
   | 'publicacion'
   | 'publicacion_eliminada'
   | 'publicacion_editada'
+  | 'respuesta'
   | 'resena'
   | 'solicitud'
   | 'solicitud_respondida'
@@ -336,6 +347,9 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const [activity, setActivity] = useState<ActivityEntry[]>(() => loadJSON(STORAGE_KEYS.ACTIVITY, []));
   useEffect(() => saveJSON(STORAGE_KEYS.ACTIVITY, activity), [activity]);
+
+  const [replies, setReplies] = useState<ReviewReply[]>(() => loadJSON(STORAGE_KEYS.REPLIES, []));
+  useEffect(() => saveJSON(STORAGE_KEYS.REPLIES, replies), [replies]);
   /** Registra un evento en el historial del panel de administración. */
   const log = (type: ActivityType, detail: string, actor?: { name: string; email: string } | null) => {
     const who = actor === undefined ? currentUserRef.current : actor;
@@ -397,6 +411,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     take('publications', setPublications, (l) => [...l].sort(desc));
     take('requests', setRequests, (l) => [...l].sort(desc));
     take('reports', setReports, (l) => [...l].sort(desc));
+    take('replies', setReplies, (l) => [...l].sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)));
     take('activity', setActivity, (l) => [...l].sort((a, b) => (a.at < b.at ? 1 : -1)));
     take('users', setUsers, (l) => {
       const missing = INITIAL_USERS.filter((f) => !l.some((u: any) => u.email?.toLowerCase() === f.email.toLowerCase())).map(stripUser);
@@ -448,6 +463,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => syncCollection('reports', reports), [reports, syncStatus]);
   useEffect(() => syncCollection('ratings', ratingsToRows(libraryRatings)), [libraryRatings, syncStatus]);
   useEffect(() => syncCollection('activity', activity), [activity, syncStatus]);
+  useEffect(() => syncCollection('replies', replies), [replies, syncStatus]);
 
   const [filter, setFilter] = useState<FilterState>(DEFAULT_FILTER);
   const [selectedPublication, setSelectedPublicationState] = useState<Publication | null>(null);
@@ -875,8 +891,42 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     atts.forEach((a) => deleteFile(a.id));
     if (REMOTE) removeFiles(atts.map((a) => a.path).filter(Boolean) as string[]);
     setPublications((prev) => prev.filter((p) => p.id !== pubId));
+    setReplies((prev) => prev.filter((r) => r.publicationId !== pubId));
     setSelectedPublicationState((prev) => (prev?.id === pubId ? null : prev));
   };
+
+  const addReply = (publicationId: string, reviewId: string, text: string): ActionResult => {
+    if (!currentUser) return { ok: false, error: 'Inicia sesión para responder.' };
+    const clean = text.trim();
+    if (clean.length < 2) return { ok: false, error: 'Escribe tu respuesta.' };
+    if (clean.length > 500) return { ok: false, error: 'La respuesta puede tener hasta 500 caracteres.' };
+    const pub = publications.find((p) => p.id === publicationId);
+    const review = pub?.reviews.find((r) => r.id === reviewId);
+    if (!pub || !review) return { ok: false, error: 'Ese comentario ya no existe.' };
+    const reply: ReviewReply = {
+      id: newId('rep'),
+      reviewId,
+      publicationId,
+      authorId: currentUser.id,
+      authorName: currentUser.name,
+      authorAvatar: currentUser.avatar,
+      text: clean,
+      createdAt: new Date().toISOString(),
+    };
+    setReplies((prev) => [...prev, reply]);
+    log('respuesta', `Respondió a ${review.authorName} en "${pub.title}"`);
+    return { ok: true };
+  };
+
+  const deleteReply = (replyId: string) => {
+    const r = replies.find((x) => x.id === replyId);
+    if (!r || !currentUser) return;
+    if (r.authorId !== currentUser.id && !isCreatorOrAdmin) return;
+    setReplies((prev) => prev.filter((x) => x.id !== replyId));
+  };
+
+  const userLevels = useMemo(() => computeAllLevels(publications, requests, replies), [publications, requests, replies]);
+  const getUserLevel = (userId?: string) => levelOf(userLevels, userId);
 
   const canDownload: ExchangeContextType['canDownload'] = (pub) => {
     if (!currentUser) return { allowed: false, reason: 'login' };
@@ -1070,6 +1120,11 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         deletePublication,
         recordResourceOpen,
         addReview,
+        replies,
+        addReply,
+        deleteReply,
+        userLevels,
+        getUserLevel,
         sendContactRequest,
         updateRequestStatus,
         reportPublication,

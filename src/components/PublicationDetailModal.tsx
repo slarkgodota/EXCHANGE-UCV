@@ -29,6 +29,8 @@ import { Avatar } from './Avatar';
 import { AttachmentList } from './AttachmentList';
 import { getCampusLabel } from '../data/ucv';
 import { Orcid, OrcidFor } from './Orcid';
+import { LevelBadge, LevelProgress } from './LevelBadge';
+import { ReviewReplies } from './ReviewReplies';
 
 export const PublicationDetailModal: React.FC = () => {
   const {
@@ -46,6 +48,7 @@ export const PublicationDetailModal: React.FC = () => {
     canDownload,
     canEditPublication,
     startEditPublication,
+    getUserLevel,
   } = useExchange();
 
   const [ratingInput, setRatingInput] = useState<number>(5);
@@ -373,6 +376,10 @@ export const PublicationDetailModal: React.FC = () => {
                     {pub.author.career} • {getCampusLabel(pub.author.campus)}{pub.author.cycle ? ` (${pub.author.cycle})` : ''}
                   </p>
                   <p className="text-xs text-slate-500 italic max-w-lg">{pub.author.bio}</p>
+                  <div className="pt-1 max-w-xs space-y-1.5">
+                    <LevelBadge userId={pub.author.id} />
+                    <LevelProgress info={getUserLevel(pub.author.id)} compact />
+                  </div>
                 </div>
               </div>
 
@@ -490,6 +497,7 @@ export const PublicationDetailModal: React.FC = () => {
                       key={star}
                       type="button"
                       onClick={() => setRatingInput(star)}
+                      aria-label={`${star} ${star === 1 ? 'estrella' : 'estrellas'}`}
                       className="p-1 hover:scale-125 transition-transform"
                     >
                       <Star
@@ -566,6 +574,7 @@ export const PublicationDetailModal: React.FC = () => {
                               {rev.authorName}
                             </span>
                             <OrcidFor userId={rev.authorId} />
+                            <LevelBadge userId={rev.authorId} showName={false} />
                             {rev.verifiedExchange && (
                               <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-medium border border-emerald-200">
                                 Tras un intercambio
@@ -593,6 +602,7 @@ export const PublicationDetailModal: React.FC = () => {
                     <p className="text-xs text-slate-600 pl-9 leading-relaxed">
                       {rev.comment}
                     </p>
+                    <ReviewReplies pub={pub} review={rev} />
                   </div>
                 ))
               )}

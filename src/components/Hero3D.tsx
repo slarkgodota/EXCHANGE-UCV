@@ -5,6 +5,7 @@ import { goTo } from '../utils/router';
 import { HOW_IT_WORKS } from '../data/catalog';
 import { UCV_FACTS } from '../data/ucv';
 import { LIBRARY_RESOURCES } from '../data/library';
+import { TopContributors } from './TopContributors';
 
 const SECTIONS = [
   { cat: 'conocimientos', icon: Users, title: 'Conocimientos', text: 'Ofrece ayuda en lo que dominas o pide apoyo para aprender.', tone: 'from-blue-500 to-indigo-600' },
@@ -103,6 +104,8 @@ export const Hero3D: React.FC = () => {
           ))}
         </ol>
       </section>
+
+      <TopContributors />
 
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-20">
         <div className="grid sm:grid-cols-2 gap-4">

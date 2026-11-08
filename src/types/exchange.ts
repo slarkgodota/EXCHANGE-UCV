@@ -70,6 +70,18 @@ export interface Review {
   verifiedExchange: boolean;
 }
 
+/** Respuesta a un comentario (reseña) de una publicación. Se guarda aparte para que no se pisen entre usuarios. */
+export interface ReviewReply {
+  id: string;
+  reviewId: string;
+  publicationId: string;
+  authorId: string;
+  authorName: string;
+  authorAvatar?: string;
+  text: string;
+  createdAt: string; // ISO
+}
+
 export interface Publication {
   id: string;
   title: string;

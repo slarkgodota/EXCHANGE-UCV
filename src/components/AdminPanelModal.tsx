@@ -9,6 +9,7 @@ import { CAREERS, UCV_CAMPUSES, getCampusLabel } from '../data/ucv';
 import { Avatar } from './Avatar';
 import { StarDisplay } from './StarRating';
 import { Orcid, OrcidFor } from './Orcid';
+import { LevelBadge } from './LevelBadge';
 
 type Tab = 'resumen' | 'usuarios' | 'historial' | 'publicaciones' | 'reportes' | 'roles';
 
@@ -19,6 +20,7 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
   publicacion: 'Publicación',
   publicacion_eliminada: 'Publicación eliminada',
   publicacion_editada: 'Publicación editada',
+  respuesta: 'Respuesta a comentario',
   resena: 'Reseña',
   solicitud: 'Solicitud',
   solicitud_respondida: 'Respuesta a solicitud',
@@ -33,6 +35,7 @@ const ACTIVITY_TONE: Partial<Record<ActivityType, string>> = {
   registro: 'bg-emerald-100 text-emerald-800',
   publicacion: 'bg-blue-100 text-blue-800',
   publicacion_editada: 'bg-sky-100 text-sky-800',
+  respuesta: 'bg-violet-100 text-violet-800',
   reporte: 'bg-red-100 text-red-700',
   cuenta_eliminada: 'bg-red-100 text-red-700',
   publicacion_eliminada: 'bg-red-100 text-red-700',
@@ -120,6 +123,7 @@ export const AdminPanelModal: React.FC = () => {
     resetDatabase,
     currentUser,
     activity,
+    getUserLevel,
   } = useExchange();
 
   const [tab, setTab] = useState<Tab>('resumen');
@@ -181,8 +185,8 @@ export const AdminPanelModal: React.FC = () => {
 
   const exportUsers = () =>
     exportCSV(`usuarios-exchange-ucv-${new Date().toISOString().slice(0, 10)}.csv`, [
-      ['Nombre', 'Correo', 'Celular', 'Rol', 'Carrera', 'Sede', 'Ciclo', 'Verificado', 'Fecha de registro'],
-      ...users.map((u) => [u.name, u.email, u.phone || '', getRoleById(u.role).name, u.career, getCampusLabel(u.campus), u.cycle, u.verified ? 'Sí' : 'No', u.createdAt || 'Cuenta inicial']),
+      ['Nombre', 'Correo', 'Celular', 'Rol', 'Nivel', 'EXP', 'Carrera', 'Sede', 'Ciclo', 'Verificado', 'Fecha de registro'],
+      ...users.map((u) => { const l = getUserLevel(u.id); return [u.name, u.email, u.phone || '', getRoleById(u.role).name, `${l.level} - ${l.name}`, String(l.xp), u.career, getCampusLabel(u.campus), u.cycle, u.verified ? 'Sí' : 'No', u.createdAt || 'Cuenta inicial']; }),
     ]);
 
   const exportActivity = () =>
@@ -415,6 +419,10 @@ export const AdminPanelModal: React.FC = () => {
                                 <p className="text-xs text-slate-500">
                                   {u.email}
                                   {u.phone ? ` · ${u.phone}` : ''}
+                                </p>
+                                <p className="mt-1 flex items-center gap-1.5">
+                                  <LevelBadge userId={u.id} />
+                                  <span className="text-[10px] text-slate-500 tabular-nums">{getUserLevel(u.id).xp} EXP</span>
                                 </p>
                               </div>
                             </div>
