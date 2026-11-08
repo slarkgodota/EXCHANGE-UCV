@@ -16,8 +16,10 @@ import { CampusSection } from './components/CampusSection';
 import { Footer } from './components/Footer';
 import { ThemeToggle } from './components/ThemeToggle';
 import { filterPublications } from './utils/exchangeLogic';
-import { RoomBanner } from './components/RoomShowcase';
-import { pickRoom } from './data/rooms';
+import { RoomBanner, RoomPicker } from './components/RoomShowcase';
+import { RoomTheme } from './components/RoomTheme';
+import { activeRoomFor } from './data/roomThemes';
+import { ROOM_BY_ID } from './data/rooms';
 import { useView, goTo } from './utils/router';
 import { BookOpen, Plus, WifiOff } from 'lucide-react';
 
@@ -30,15 +32,16 @@ const CatalogView: React.FC = () => {
     const id = window.setTimeout(() => setRoomFilter(filter), 450);
     return () => window.clearTimeout(id);
   }, [filter.searchQuery, filter.career, filter.category, filter.course]);
-  const room = pickRoom(roomFilter);
+  const active = activeRoomFor(roomFilter);
   const publish = () => (isLoggedIn ? setIsCreateModalOpen(true) : openAuth('register'));
 
   return (
     <div className="space-y-8">
       <header className="reveal-1 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-4xl sm:text-5xl font-bold text-slate-900 tracking-tight">Catálogo</h1>
-          <p className="text-slate-500 mt-2">Lo que comparten y buscan los estudiantes de la UCV.</p>
+          {active && <p key={active + '-k'} className="room-title text-xs font-bold uppercase tracking-[0.2em] text-red-700">Catálogo · {ROOM_BY_ID[active].label}</p>}
+          <h1 key={active ?? 'none'} className="room-title font-display text-4xl sm:text-5xl font-bold text-slate-900 tracking-tight">{active ? ROOM_BY_ID[active].place : 'Catálogo'}</h1>
+          <p className="text-slate-500 mt-2">{active ? ROOM_BY_ID[active].tagline : 'Lo que comparten y buscan los estudiantes de la UCV.'}</p>
         </div>
         <button
           type="button"
@@ -50,7 +53,8 @@ const CatalogView: React.FC = () => {
       </header>
 
       <div className="reveal-2">
-        <RoomBanner room={room} count={list.length} />
+        <RoomBanner room={active} count={list.length} />
+        <RoomPicker active={active} />
       </div>
 
       <div className="reveal-2">
@@ -111,7 +115,8 @@ const ExchangePortal: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-red-500 selection:text-white">
+    <div className="app-shell min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-red-500 selection:text-white">
+      <RoomTheme />
       {!isOnline && (
         <div className="bg-amber-500 text-amber-950 text-xs font-bold py-2 px-4 flex items-center justify-center gap-2">
           <WifiOff className="w-4 h-4" /> Sin conexión: puedes ver lo guardado en este dispositivo.

@@ -25,7 +25,7 @@ export const Hero3D: React.FC = () => {
 
   return (
     <>
-      <section className="relative overflow-hidden bg-[#0a1430] text-white">
+      <section className="on-dark relative overflow-hidden bg-[#0a1430] text-white">
         <div aria-hidden className="blob absolute -top-40 -right-32 w-[560px] h-[560px] rounded-full bg-red-600/30 blur-3xl" />
         <div aria-hidden className="blob-slow absolute -bottom-48 -left-32 w-[480px] h-[480px] rounded-full bg-blue-500/20 blur-3xl" />
         <div aria-hidden className="absolute inset-0 opacity-[0.06] bg-[radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] [background-size:24px_24px]" />

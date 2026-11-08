@@ -4,18 +4,22 @@ import { useExchange } from '../context/ExchangeContext';
 import { goTo } from '../utils/router';
 import { ROOMS, ROOM_BY_ID, RoomId, roomForCareer } from '../data/rooms';
 import { RoomCanvas } from './RoomCanvas';
+import { activeRoomFor } from '../data/roomThemes';
 
 const AUTO_MS = 7000;
 
 /** Portada: los cuartos 3D van cambiando solos; se puede elegir uno y saltar al catálogo de esa carrera. */
 export const HeroRooms: React.FC = () => {
-  const { currentUser, setFilter } = useExchange();
+  const { currentUser, setFilter, filter } = useExchange();
+  const inside = activeRoomFor(filter);
   const order = useMemo<RoomId[]>(() => {
-    const mine = roomForCareer(currentUser?.career);
+    const mine = inside ?? roomForCareer(currentUser?.career);
     const ids = ROOMS.map((r) => r.id);
     return mine ? [mine, ...ids.filter((i) => i !== mine)] : ids;
-  }, [currentUser?.career]);
+  }, [currentUser?.career, inside]);
   const [idx, setIdx] = useState(0);
+  // Al entrar a otro cuarto, el carrusel empieza por ese cuarto
+  useEffect(() => setIdx(0), [inside]);
   const [pausedUntil, setPausedUntil] = useState(0);
   const room = order[idx % order.length];
   const meta = ROOM_BY_ID[room];
@@ -84,11 +88,14 @@ export const HeroRooms: React.FC = () => {
 };
 
 /** Catálogo: el cuarto cambia según lo que la persona busca o filtra. */
-export const RoomBanner: React.FC<{ room: RoomId; count: number }> = ({ room, count }) => {
-  const meta = ROOM_BY_ID[room];
+export const RoomBanner: React.FC<{ room: RoomId | null; count: number }> = ({ room: active, count }) => {
+  const room: RoomId = active ?? 'biblioteca';
+  const meta = active
+    ? ROOM_BY_ID[room]
+    : { ...ROOM_BY_ID.biblioteca, label: 'Todas las carreras', place: 'Catálogo general', tagline: 'Elige una carrera o categoría y toda la página se convertirá en su cuarto.' };
   return (
     <section
-      className="relative h-60 sm:h-72 rounded-3xl overflow-hidden text-white transition-[background] duration-700"
+      className="on-dark relative h-60 sm:h-72 rounded-3xl overflow-hidden text-white transition-[background] duration-700"
       style={{ background: `radial-gradient(130% 120% at 80% 30%, ${meta.bg[1]}, ${meta.bg[0]})` }}
       aria-label={`Estás en: ${meta.place}`}
     >
@@ -103,5 +110,37 @@ export const RoomBanner: React.FC<{ room: RoomId; count: number }> = ({ room, co
         </p>
       </div>
     </section>
+  );
+};
+
+/** Fila de "puertas": entrar al cuarto de cada carrera o categoría desde el catálogo. */
+export const RoomPicker: React.FC<{ active: RoomId | null }> = ({ active }) => {
+  const { setFilter } = useExchange();
+  const enter = (r: RoomId) => {
+    const m = ROOM_BY_ID[r];
+    setFilter((prev) => ({ ...prev, searchQuery: '', career: m.career ?? 'todas', category: m.category ?? 'todas' }));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  return (
+    <div className="mt-3">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Entra a un cuarto</p>
+      <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar" role="list">
+        {ROOMS.map((r) => (
+          <button
+            key={r.id}
+            type="button"
+            role="listitem"
+            onClick={() => enter(r.id)}
+            aria-pressed={active === r.id}
+            className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
+              active === r.id ? 'bg-red-600 text-white border-red-600' : 'bg-white text-slate-700 border-slate-200 hover:border-red-500 hover:text-red-700'
+            }`}
+          >
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: `linear-gradient(135deg, ${r.bg[0]}, ${r.bg[1]})` }} />
+            {r.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 };

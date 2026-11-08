@@ -50,7 +50,7 @@ export const ROOMS: RoomMeta[] = [
     tagline: 'Concreto, estructuras y topografía: construimos el Perú.',
     career: 'Ingeniería Civil',
     keywords: ['ingenieria civil', 'civil', 'concreto', 'estructur', 'suelo', 'topograf', 'hidraul', 'construc', 'puente', 'carretera', 'vias', 'estatica', 'resistencia de materiales', 'edificacion', 'sismo', 'cimentacion', 'obra', 'mecanica de suelos'],
-    bg: ['#3a2a10', '#b7791f'],
+    bg: ['#3a2a10', '#a16207'],
   },
   {
     id: 'sistemas',
@@ -77,7 +77,7 @@ export const ROOMS: RoomMeta[] = [
     tagline: 'Maquetas, planos y ciudades que nacen en una mesa.',
     career: 'Arquitectura',
     keywords: ['arquitect', 'maqueta', 'urbanis', 'autocad', 'revit', 'croquis', 'paisajismo', 'diseno arquitectonico', 'taller de diseno'],
-    bg: ['#2d2a26', '#a8a29e'],
+    bg: ['#2d2a26', '#78716c'],
   },
   {
     id: 'medicina',
@@ -86,7 +86,7 @@ export const ROOMS: RoomMeta[] = [
     tagline: 'Anatomía, diagnóstico y un corazón que no deja de latir.',
     career: 'Medicina Humana',
     keywords: ['medicina', 'medico', 'anatomia', 'fisiologia', 'cardio', 'cirugia', 'farmacolog', 'patologia', 'clinica', 'diagnostico', 'histologia', 'semiologia', 'microbiolog'],
-    bg: ['#0f3b38', '#14b8a6'],
+    bg: ['#0f3b38', '#0f766e'],
   },
   {
     id: 'enfermeria',
@@ -95,7 +95,7 @@ export const ROOMS: RoomMeta[] = [
     tagline: 'Cuidado del paciente, turno a turno.',
     career: 'Enfermería',
     keywords: ['enfermeria', 'enfermer', 'cuidado', 'paciente', 'triaje', 'primeros auxilios', 'inyectable', 'salud publica', 'signos vitales'],
-    bg: ['#0c2d48', '#3b82f6'],
+    bg: ['#0c2d48', '#2563eb'],
   },
   {
     id: 'psicologia',
@@ -104,7 +104,7 @@ export const ROOMS: RoomMeta[] = [
     tagline: 'Mente, conducta y emociones en un espacio tranquilo.',
     career: 'Psicología',
     keywords: ['psicolog', 'mente', 'conducta', 'terapia', 'emocion', 'cognitiv', 'neuro', 'personalidad', 'salud mental', 'test psicologico'],
-    bg: ['#2e1f47', '#8b5cf6'],
+    bg: ['#2e1f47', '#7c3aed'],
   },
   {
     id: 'administracion',
@@ -140,7 +140,7 @@ export const ROOMS: RoomMeta[] = [
     tagline: 'Pizarra, tiza y ganas de enseñar.',
     career: 'Educación',
     keywords: ['educacion', 'pedagog', 'docencia', 'didactica', 'aprendizaje', 'ensenanza', 'inicial', 'primaria', 'curriculo', 'aula', 'evaluacion educativa'],
-    bg: ['#3d2b12', '#d97706'],
+    bg: ['#3d2b12', '#b45309'],
   },
   {
     id: 'tutoria',
@@ -149,7 +149,7 @@ export const ROOMS: RoomMeta[] = [
     tagline: 'Enseña lo que dominas y aprende lo que te falta.',
     category: 'conocimientos',
     keywords: ['tutoria', 'asesoria', 'refuerzo', 'clases particulares', 'ayuda en'],
-    bg: ['#172554', '#2563eb'],
+    bg: ['#172554', '#1d4ed8'],
   },
   {
     id: 'biblioteca',
@@ -167,7 +167,7 @@ export const ROOMS: RoomMeta[] = [
     tagline: 'Ideas, experimentos y equipos para tu tesis.',
     category: 'investigacion',
     keywords: ['investigacion', 'tesis', 'laboratorio', 'quimica', 'biologia', 'ciencia', 'experimento', 'metodologia', 'articulo cientifico', 'proyecto de investigacion'],
-    bg: ['#052e2b', '#0d9488'],
+    bg: ['#052e2b', '#0f766e'],
   },
 ];
 

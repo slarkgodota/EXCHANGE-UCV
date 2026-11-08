@@ -23,6 +23,8 @@ interface Engine {
   pointer: { x: number; y: number; tx: number; ty: number };
   w: number;
   h: number;
+  dist: number;
+  dir: { x: number; y: number; z: number };
 }
 
 /**
@@ -32,8 +34,9 @@ interface Engine {
  * - Si el navegador no tiene WebGL, muestra un fondo con el nombre del cuarto.
  * - Respeta "reducir movimiento" del sistema.
  */
-export const RoomCanvas: React.FC<{ room: RoomId; align?: 'center' | 'right'; lift?: number; zoom?: number; className?: string; interactive?: boolean }> = ({
+export const RoomCanvas: React.FC<{ room: RoomId; align?: 'center' | 'right'; lift?: number; zoom?: number; flyIn?: boolean; className?: string; interactive?: boolean }> = ({
   room,
+  flyIn = false,
   align = 'center',
   lift = 0,
   zoom = 1,
@@ -44,6 +47,8 @@ export const RoomCanvas: React.FC<{ room: RoomId; align?: 'center' | 'right'; li
   liftRef.current = lift;
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
+  const flyRef = useRef(flyIn);
+  flyRef.current = flyIn;
   const host = useRef<HTMLDivElement>(null);
   const eng = useRef<Engine | null>(null);
   const alignRef = useRef(align);
@@ -98,7 +103,7 @@ export const RoomCanvas: React.FC<{ room: RoomId; align?: 'center' | 'right'; li
         scene.add(sun);
         scene.add(sun.target);
 
-        const e: Engine = { T, renderer, scene, camera, hemi, sun, built: null, t: 0, intro: 0, pointer: { x: 0, y: 0, tx: 0, ty: 0 }, w: 1, h: 1 };
+        const e: Engine = { T, renderer, scene, camera, hemi, sun, built: null, t: 0, intro: 0, pointer: { x: 0, y: 0, tx: 0, ty: 0 }, w: 1, h: 1, dist: 30, dir: { x: 0.6, y: 0.5, z: 0.6 } };
         eng.current = e;
 
         const frame = () => {
@@ -117,7 +122,9 @@ export const RoomCanvas: React.FC<{ room: RoomId; align?: 'center' | 'right'; li
           const dist = Math.max(fit / (tanV * rh), fit / (tanV * aspect * rw));
           const dir = { x: 1, y: 0.78, z: 1 };
           const len = Math.hypot(dir.x, dir.y, dir.z);
-          camera.position.set((dir.x / len) * dist, (dir.y / len) * dist + 1.4, (dir.z / len) * dist);
+          e.dist = dist;
+          e.dir = { x: dir.x / len, y: dir.y / len, z: dir.z / len };
+          camera.position.set(e.dir.x * dist, e.dir.y * dist + 1.4, e.dir.z * dist);
           camera.lookAt(0, 1.6, 0);
           // Desplaza la imagen (sin zoom) para centrar el cuarto en esa zona
           const cx = right ? 1 - rw : 0;
@@ -168,6 +175,15 @@ export const RoomCanvas: React.FC<{ room: RoomId; align?: 'center' | 'right'; li
             p.scale.setScalar(Math.max(0.001, s));
           });
           for (const f of b.ticks) f(e.t, reduce ? 0 : dt);
+          // "Entrar al cuarto": la cámara avanza hacia adentro al final de la intro
+          if (flyRef.current && !reduce) {
+            const z = clamp((e.intro - 1.0) / 1.1);
+            const ez = z * z * z;
+            const d = e.dist * (1 - 0.7 * ez);
+            const ty = 1.6 - 0.5 * ez;
+            camera.position.set(e.dir.x * d, e.dir.y * d + 1.4 - 1.2 * ez, e.dir.z * d);
+            camera.lookAt(0, ty, 0);
+          }
           renderer.render(scene, camera);
         };
         raf = requestAnimationFrame(loop);
