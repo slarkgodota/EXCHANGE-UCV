@@ -1,11 +1,9 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { DoorOpen, LogOut, SkipForward } from 'lucide-react';
 import { useExchange } from '../context/ExchangeContext';
-import { ROOM_BY_ID, RoomId } from '../data/rooms';
-import { ROOM_THEMES, themeVars, activeRoomFor, Motif } from '../data/roomThemes';
-import { RoomCanvas } from './RoomCanvas';
+import type { SceneId } from '../data/careerScenes';
+import { CAREER_THEMES, themeVars, activeCareerFor, Motif } from '../data/careerThemes';
 
-/* ───────────────────────── Fondo animado de cada cuarto ───────────────────────── */
+/* ───────────────────────── Fondo animado de cada carrera ───────────────────────── */
 
 type Ctx = CanvasRenderingContext2D;
 interface MotifState { [k: string]: any }
@@ -254,7 +252,7 @@ const MOTIFS: Record<Motif, (c: Ctx, w: number, h: number, t: number, dt: number
   },
 };
 
-const RoomBackdrop: React.FC<{ room: RoomId; colors: { a: string; b: string }; opacity: number }> = ({ room, colors, opacity }) => {
+const CareerBackdrop: React.FC<{ career: SceneId; colors: { a: string; b: string }; opacity: number }> = ({ career, colors, opacity }) => {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const cv = ref.current;
@@ -271,7 +269,7 @@ const RoomBackdrop: React.FC<{ room: RoomId; colors: { a: string; b: string }; o
     resize();
     window.addEventListener('resize', resize);
     const col = colors;
-    const draw = MOTIFS[ROOM_THEMES[room].motif];
+    const draw = MOTIFS[CAREER_THEMES[career].motif];
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       skip = !skip;
@@ -288,67 +286,27 @@ const RoomBackdrop: React.FC<{ room: RoomId; colors: { a: string; b: string }; o
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
     };
-  }, [room]);
-  return <canvas ref={ref} aria-hidden className="room-backdrop" style={{ opacity }} />;
-};
-
-/* ───────────────────────── Animación de "entrar al cuarto" ───────────────────────── */
-
-const ENTER_MS = 2600;
-
-const EnterOverlay: React.FC<{ room: RoomId; onDone: () => void }> = ({ room, onDone }) => {
-  const meta = ROOM_BY_ID[room];
-  const th = ROOM_THEMES[room];
-  const [leaving, setLeaving] = useState(false);
-  useEffect(() => {
-    const a = window.setTimeout(() => setLeaving(true), ENTER_MS - 550);
-    const b = window.setTimeout(onDone, ENTER_MS);
-    return () => {
-      window.clearTimeout(a);
-      window.clearTimeout(b);
-    };
-  }, [room]);
-  return (
-    <div
-      className={`room-enter fixed inset-0 z-[90] flex flex-col items-center justify-center text-white ${leaving ? 'is-leaving' : ''}`}
-      style={{ background: `radial-gradient(120% 90% at 50% 30%, ${th.hero[1]}, ${th.hero[0]})` }}
-      role="dialog"
-      aria-label={`Entrando a ${meta.place}`}
-      onClick={onDone}
-    >
-      <div className="relative w-full max-w-3xl aspect-[16/10] max-h-[62vh]">
-        <RoomCanvas room={room} flyIn interactive={false} className="absolute inset-0" />
-      </div>
-      <p className="room-enter-kicker mt-2 text-xs font-bold uppercase tracking-[0.3em] text-white/70">Entrando a</p>
-      <h2 className="room-enter-title mt-1 text-4xl sm:text-5xl font-bold text-center px-4" style={{ fontFamily: th.font }}>
-        {meta.place}
-      </h2>
-      <p className="room-enter-kicker mt-2 text-sm text-white/80 text-center px-6">{meta.tagline}</p>
-      <button type="button" onClick={onDone} className="absolute bottom-6 right-6 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/15 hover:bg-white/25 text-xs font-semibold">
-        <SkipForward className="w-3.5 h-3.5" /> Saltar
-      </button>
-    </div>
-  );
+  }, [career]);
+  return <canvas ref={ref} aria-hidden className="career-backdrop" style={{ opacity }} />;
 };
 
 /* ───────────────────────── Controlador ───────────────────────── */
 
 /**
- * Cuando la persona elige una carrera o categoría (o la busca), TODA la página
- * se convierte en ese cuarto: colores, letras, fondo animado, portada y pie.
+ * Cuando la persona elige una carrera o categoría (o la busca), toda la página toma
+ * los colores, la letra y el fondo animado de esa carrera. Al volver a "Todas", se ve normal.
  */
-export const RoomTheme: React.FC = () => {
-  const { filter, setFilter } = useExchange();
-  const [room, setRoom] = useState<RoomId | null>(null);
-  const [entering, setEntering] = useState<RoomId | null>(null);
+export const CareerTheme: React.FC = () => {
+  const { filter } = useExchange();
+  const [career, setCareer] = useState<SceneId | null>(null);
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
   const first = useRef(true);
 
-  // Cuarto según el filtro (la búsqueda espera un poco para no cambiar en cada tecla)
+  // Carrera según el filtro (la búsqueda espera un poco para no cambiar en cada tecla)
   useEffect(() => {
-    const target = activeRoomFor(filter);
+    const target = activeCareerFor(filter);
     const wait = filter.searchQuery && target ? 700 : 0;
-    const id = window.setTimeout(() => setRoom(target), wait);
+    const id = window.setTimeout(() => setCareer(target), wait);
     return () => window.clearTimeout(id);
   }, [filter.searchQuery, filter.career, filter.category]);
 
@@ -359,51 +317,28 @@ export const RoomTheme: React.FC = () => {
     return () => mo.disconnect();
   }, []);
 
-  // Aplicar el tema a <html> (antes de pintar, para que no parpadee)
+  // Aplicar el tema a <html> (antes de pintar, para que no parpadee) con una transición suave de colores
   useLayoutEffect(() => {
     const root = document.documentElement;
-    const prev = root.dataset.room;
-    if (room) {
-      root.dataset.room = room;
-      const vars = themeVars(room, dark);
-      Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
-    } else {
-      delete root.dataset.room;
-    }
-    if (!first.current && room && room !== prev) {
-      const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-      if (!reduce) setEntering(room);
-    }
-    if (!first.current && !room && prev) {
+    const prev = root.dataset.career;
+    if (!first.current && prev !== (career ?? undefined)) {
       root.classList.add('theme-anim');
-      window.setTimeout(() => root.classList.remove('theme-anim'), 400);
+      window.setTimeout(() => root.classList.remove('theme-anim'), 450);
+    }
+    if (career) {
+      root.dataset.career = career;
+      Object.entries(themeVars(career, dark)).forEach(([k, v]) => root.style.setProperty(k, v));
+    } else {
+      delete root.dataset.career;
     }
     first.current = false;
-  }, [room, dark]);
+  }, [career, dark]);
 
   useEffect(() => () => {
-    delete document.documentElement.dataset.room;
+    delete document.documentElement.dataset.career;
   }, []);
 
-  const exit = () => setFilter((prev) => ({ ...prev, career: 'todas', category: 'todas', searchQuery: '' }));
-
-  return (
-    <>
-      {room && (() => {
-        const v = themeVars(room, dark);
-        return <RoomBackdrop key={room + (dark ? '-d' : '-l')} room={room} colors={{ a: v['--r-motif'], b: v['--r-accent2'] }} opacity={Number(v['--r-motif-op'])} />;
-      })()}
-      {room && (
-        <div className="room-bar fixed left-3 bottom-3 sm:left-5 sm:bottom-5 z-40 flex items-center gap-2 pl-3 pr-1.5 py-1.5 rounded-full shadow-xl text-white text-xs font-semibold"
-          style={{ background: 'linear-gradient(135deg, var(--r-hero-1), var(--r-hero-2))' }}>
-          <DoorOpen className="w-4 h-4 shrink-0" />
-          <span className="truncate max-w-[42vw] sm:max-w-none">Estás en: {ROOM_BY_ID[room].place}</span>
-          <button type="button" onClick={exit} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/15 hover:bg-white/30">
-            <LogOut className="w-3.5 h-3.5" /> Salir
-          </button>
-        </div>
-      )}
-      {entering && <EnterOverlay key={entering} room={entering} onDone={() => setEntering(null)} />}
-    </>
-  );
+  if (!career) return null;
+  const v = themeVars(career, dark);
+  return <CareerBackdrop key={career + (dark ? '-d' : '-l')} career={career} colors={{ a: v['--r-motif'], b: v['--r-accent2'] }} opacity={Number(v['--r-motif-op'])} />;
 };

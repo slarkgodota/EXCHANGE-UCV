@@ -1,5 +1,5 @@
 /**
- * Carga three.js (motor 3D) solo cuando se va a mostrar un cuarto.
+ * Carga three.js (motor 3D) solo cuando se va a mostrar una escena 3D.
  * En GitHub Pages config.js apunta a la copia incluida (vendor/three); si no, se usa jsDelivr.
  */
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.min.js';

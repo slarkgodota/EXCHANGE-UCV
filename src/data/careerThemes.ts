@@ -1,15 +1,15 @@
-import type { RoomId } from './rooms';
-import { scoreText, roomForCareer } from './rooms';
+import type { SceneId } from './careerScenes';
+import { scoreText, sceneForCareer } from './careerScenes';
 
 /**
- * Identidad visual de cada "cuarto": cuando la persona elige una carrera o categoría,
+ * Identidad visual de cada carrera: cuando la persona elige una carrera o categoría,
  * TODA la página cambia a estos colores, letras y fondo animado.
  */
 export type Motif =
   | 'law' | 'blueprint' | 'code' | 'gears' | 'drafting' | 'ecg' | 'care' | 'mind'
   | 'charts' | 'numbers' | 'studio' | 'chalk' | 'bubbles' | 'books' | 'molecules';
 
-export interface RoomTheme {
+export interface CareerTheme {
   hue: number; // tono base para fondos y superficies
   sat: number; // saturación de las superficies (0-100)
   accent: string; // botones (con texto blanco encima)
@@ -29,7 +29,7 @@ const CHALK = '"Chalkboard SE", "Comic Neue", "Comic Sans MS", "Segoe Print", cu
 const CLEAN = '"Segoe UI", "Helvetica Neue", system-ui, sans-serif';
 const BOLD = '"Anton", Impact, "Arial Black", sans-serif';
 
-export const ROOM_THEMES: Record<RoomId, RoomTheme> = {
+export const CAREER_THEMES: Record<SceneId, CareerTheme> = {
   derecho: { hue: 8, sat: 30, accent: '#8b1e2d', accentLight: '#f5c08a', accent2: '#c9a227', hero: ['#2a0f12', '#7a2e2e'], font: SERIF, motif: 'law' },
   civil: { hue: 38, sat: 35, accent: '#b45309', accentLight: '#fbbf24', accent2: '#facc15', hero: ['#1c1917', '#92400e'], font: CONDENSED, motif: 'blueprint' },
   sistemas: { hue: 232, sat: 40, accent: '#4f46e5', accentLight: '#67e8f9', accent2: '#22d3ee', hero: ['#070b1a', '#312e81'], font: MONO, motif: 'code' },
@@ -49,9 +49,9 @@ export const ROOM_THEMES: Record<RoomId, RoomTheme> = {
 
 const hsl = (h: number, s: number, l: number) => `hsl(${h} ${s}% ${l}%)`;
 
-/** Variables CSS del cuarto según modo claro u oscuro. */
-export function themeVars(id: RoomId, dark: boolean): Record<string, string> {
-  const t = ROOM_THEMES[id];
+/** Variables CSS de la carrera según modo claro u oscuro. */
+export function themeVars(id: SceneId, dark: boolean): Record<string, string> {
+  const t = CAREER_THEMES[id];
   const { hue: h, sat: s } = t;
   const base = dark
     ? {
@@ -98,14 +98,14 @@ export function themeVars(id: RoomId, dark: boolean): Record<string, string> {
 }
 
 /**
- * Cuarto activo según lo que la persona eligió. Devuelve null si no eligió nada
+ * Carrera activa según lo que la persona eligió. Devuelve null si no eligió nada
  * (entonces la página se ve normal).
  */
-export function activeRoomFor(f: { searchQuery?: string; career?: string; category?: string }): RoomId | null {
+export function activeCareerFor(f: { searchQuery?: string; career?: string; category?: string }): SceneId | null {
   const byText = scoreText(f.searchQuery || '');
   if (byText) return byText.id;
   if (f.career && f.career !== 'todas') {
-    const r = roomForCareer(f.career);
+    const r = sceneForCareer(f.career);
     if (r) return r;
   }
   if (f.category === 'conocimientos') return 'tutoria';

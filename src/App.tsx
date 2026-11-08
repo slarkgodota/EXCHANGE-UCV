@@ -16,32 +16,32 @@ import { CampusSection } from './components/CampusSection';
 import { Footer } from './components/Footer';
 import { ThemeToggle } from './components/ThemeToggle';
 import { filterPublications } from './utils/exchangeLogic';
-import { RoomBanner, RoomPicker } from './components/RoomShowcase';
-import { RoomTheme } from './components/RoomTheme';
-import { activeRoomFor } from './data/roomThemes';
-import { ROOM_BY_ID } from './data/rooms';
+import { CareerBanner, CareerPicker } from './components/CareerShowcase';
+import { CareerTheme } from './components/CareerTheme';
+import { activeCareerFor } from './data/careerThemes';
+import { SCENE_BY_ID } from './data/careerScenes';
 import { useView, goTo } from './utils/router';
 import { BookOpen, Plus, WifiOff } from 'lucide-react';
 
 const CatalogView: React.FC = () => {
   const { publications, filter, resetFilter, setIsCreateModalOpen, isLoggedIn, openAuth } = useExchange();
   const list = filterPublications(publications, filter);
-  // El cuarto 3D cambia según lo que se busca (con una pequeña espera para no cambiar en cada tecla)
-  const [roomFilter, setRoomFilter] = useState(filter);
+  // La escena 3D de la carrera cambia según lo que se busca (con una pequeña espera para no cambiar en cada tecla)
+  const [careerFilter, setCareerFilter] = useState(filter);
   useEffect(() => {
-    const id = window.setTimeout(() => setRoomFilter(filter), 450);
+    const id = window.setTimeout(() => setCareerFilter(filter), 450);
     return () => window.clearTimeout(id);
   }, [filter.searchQuery, filter.career, filter.category, filter.course]);
-  const active = activeRoomFor(roomFilter);
+  const active = activeCareerFor(careerFilter);
   const publish = () => (isLoggedIn ? setIsCreateModalOpen(true) : openAuth('register'));
 
   return (
     <div className="space-y-8">
       <header className="reveal-1 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          {active && <p key={active + '-k'} className="room-title text-xs font-bold uppercase tracking-[0.2em] text-red-700">Catálogo · {ROOM_BY_ID[active].label}</p>}
-          <h1 key={active ?? 'none'} className="room-title font-display text-4xl sm:text-5xl font-bold text-slate-900 tracking-tight">{active ? ROOM_BY_ID[active].place : 'Catálogo'}</h1>
-          <p className="text-slate-500 mt-2">{active ? ROOM_BY_ID[active].tagline : 'Lo que comparten y buscan los estudiantes de la UCV.'}</p>
+          {active && <p key={active + '-k'} className="career-title text-xs font-bold uppercase tracking-[0.2em] text-red-700">Catálogo</p>}
+          <h1 key={active ?? 'none'} className="career-title font-display text-4xl sm:text-5xl font-bold text-slate-900 tracking-tight">{active ? SCENE_BY_ID[active].label : 'Catálogo'}</h1>
+          <p className="text-slate-500 mt-2">{active ? SCENE_BY_ID[active].tagline : 'Lo que comparten y buscan los estudiantes de la UCV.'}</p>
         </div>
         <button
           type="button"
@@ -53,8 +53,8 @@ const CatalogView: React.FC = () => {
       </header>
 
       <div className="reveal-2">
-        <RoomBanner room={active} count={list.length} />
-        <RoomPicker active={active} />
+        {active && <div className="mb-3"><CareerBanner scene={active} count={list.length} /></div>}
+        <CareerPicker active={active} />
       </div>
 
       <div className="reveal-2">
@@ -116,7 +116,7 @@ const ExchangePortal: React.FC = () => {
 
   return (
     <div className="app-shell min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-red-500 selection:text-white">
-      <RoomTheme />
+      <CareerTheme />
       {!isOnline && (
         <div className="bg-amber-500 text-amber-950 text-xs font-bold py-2 px-4 flex items-center justify-center gap-2">
           <WifiOff className="w-4 h-4" /> Sin conexión: puedes ver lo guardado en este dispositivo.

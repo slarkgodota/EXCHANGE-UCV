@@ -1,11 +1,11 @@
 import type { CareerType, CategoryType } from '../types/exchange';
 
 /**
- * Cuartos 3D: uno por carrera y uno por sección del catálogo.
+ * Escenas 3D de cada carrera (y de cada sección del catálogo).
  * Este archivo solo tiene los datos (nombre, carrera, palabras clave y colores);
- * los modelos 3D están en src/three/rooms3d.ts.
+ * los modelos 3D están en src/three/scenes3d.ts.
  */
-export type RoomId =
+export type SceneId =
   | 'derecho'
   | 'civil'
   | 'sistemas'
@@ -22,23 +22,23 @@ export type RoomId =
   | 'tutoria'
   | 'investigacion';
 
-export interface RoomMeta {
-  id: RoomId;
+export interface SceneMeta {
+  id: SceneId;
   label: string; // nombre corto (chip)
-  place: string; // qué cuarto es
+  place: string; // lugar de la escena
   tagline: string;
   career?: CareerType; // carrera que abre en el catálogo
   category?: CategoryType; // o sección
-  keywords: string[]; // palabras (sin tildes) que activan el cuarto al buscar
-  bg: [string, string]; // degradado de fondo detrás del cuarto
+  keywords: string[]; // palabras (sin tildes) que activan la carrera al buscar
+  bg: [string, string]; // degradado de fondo detrás de la escena
 }
 
-export const ROOMS: RoomMeta[] = [
+export const SCENES: SceneMeta[] = [
   {
     id: 'derecho',
     label: 'Derecho',
-    place: 'Despacho jurídico',
-    tagline: 'Códigos, casos y jurisprudencia: aquí se prepara la defensa.',
+    place: 'Palacio de Justicia',
+    tagline: 'Leyes, casos y jurisprudencia: aquí se defiende la justicia.',
     career: 'Derecho',
     keywords: ['derecho', 'abogad', 'juridic', 'penal', 'constitucional', 'procesal', 'notarial', 'ley', 'leyes', 'legal', 'tribunal', 'juez', 'jurisprudencia', 'criminolog', 'litigio', 'codigo civil', 'derechos humanos'],
     bg: ['#3b1d1d', '#7a2e2e'],
@@ -55,8 +55,8 @@ export const ROOMS: RoomMeta[] = [
   {
     id: 'sistemas',
     label: 'Ing. de Sistemas',
-    place: 'Laboratorio de cómputo',
-    tagline: 'Código, redes y datos funcionando las 24 horas.',
+    place: 'Centro de datos',
+    tagline: 'Servidores, redes y código conectando al mundo.',
     career: 'Ingeniería de Sistemas',
     keywords: ['sistemas', 'software', 'programa', 'codigo', 'informatica', 'computacion', 'base de datos', 'redes', 'java', 'python', 'web', 'algoritm', 'datos', 'ciberseguridad', 'inteligencia artificial', 'desarrollo web', 'desarrollo de software'],
     bg: ['#0b1023', '#312e81'],
@@ -64,7 +64,7 @@ export const ROOMS: RoomMeta[] = [
   {
     id: 'industrial',
     label: 'Ing. Industrial',
-    place: 'Planta de producción',
+    place: 'Planta industrial',
     tagline: 'Procesos, calidad y logística en movimiento.',
     career: 'Ingeniería Industrial',
     keywords: ['industrial', 'produccion', 'procesos', 'manufactura', 'logistica', 'calidad', 'operaciones', 'mantenimiento', 'seguridad industrial', 'planta', 'lean', 'ergonomia'],
@@ -73,8 +73,8 @@ export const ROOMS: RoomMeta[] = [
   {
     id: 'arquitectura',
     label: 'Arquitectura',
-    place: 'Taller de diseño',
-    tagline: 'Maquetas, planos y ciudades que nacen en una mesa.',
+    place: 'Ciudad en diseño',
+    tagline: 'Edificios y espacios que nacen de un plano.',
     career: 'Arquitectura',
     keywords: ['arquitect', 'maqueta', 'urbanis', 'autocad', 'revit', 'croquis', 'paisajismo', 'diseno arquitectonico', 'taller de diseno'],
     bg: ['#2d2a26', '#78716c'],
@@ -82,8 +82,8 @@ export const ROOMS: RoomMeta[] = [
   {
     id: 'medicina',
     label: 'Medicina',
-    place: 'Consultorio médico',
-    tagline: 'Anatomía, diagnóstico y un corazón que no deja de latir.',
+    place: 'Hospital',
+    tagline: 'Diagnóstico, cirugía y un corazón que no deja de latir.',
     career: 'Medicina Humana',
     keywords: ['medicina', 'medico', 'anatomia', 'fisiologia', 'cardio', 'cirugia', 'farmacolog', 'patologia', 'clinica', 'diagnostico', 'histologia', 'semiologia', 'microbiolog'],
     bg: ['#0f3b38', '#0f766e'],
@@ -91,7 +91,7 @@ export const ROOMS: RoomMeta[] = [
   {
     id: 'enfermeria',
     label: 'Enfermería',
-    place: 'Sala de hospital',
+    place: 'Centro de salud',
     tagline: 'Cuidado del paciente, turno a turno.',
     career: 'Enfermería',
     keywords: ['enfermeria', 'enfermer', 'cuidado', 'paciente', 'triaje', 'primeros auxilios', 'inyectable', 'salud publica', 'signos vitales'],
@@ -100,8 +100,8 @@ export const ROOMS: RoomMeta[] = [
   {
     id: 'psicologia',
     label: 'Psicología',
-    place: 'Consultorio de psicología',
-    tagline: 'Mente, conducta y emociones en un espacio tranquilo.',
+    place: 'Parque del bienestar',
+    tagline: 'Mente, conducta y emociones en equilibrio.',
     career: 'Psicología',
     keywords: ['psicolog', 'mente', 'conducta', 'terapia', 'emocion', 'cognitiv', 'neuro', 'personalidad', 'salud mental', 'test psicologico'],
     bg: ['#2e1f47', '#7c3aed'],
@@ -109,7 +109,7 @@ export const ROOMS: RoomMeta[] = [
   {
     id: 'administracion',
     label: 'Administración',
-    place: 'Oficina gerencial',
+    place: 'Distrito empresarial',
     tagline: 'Estrategia, marketing y números que suben.',
     career: 'Administración',
     keywords: ['administracion', 'gestion', 'empresa', 'marketing', 'negocio', 'gerencia', 'emprend', 'recursos humanos', 'estrategia', 'liderazgo', 'ventas'],
@@ -118,7 +118,7 @@ export const ROOMS: RoomMeta[] = [
   {
     id: 'contabilidad',
     label: 'Contabilidad',
-    place: 'Estudio contable',
+    place: 'Banco y finanzas',
     tagline: 'Balances, tributos y cada sol en su lugar.',
     career: 'Contabilidad',
     keywords: ['contab', 'finanza', 'tributa', 'impuesto', 'costos', 'auditoria', 'presupuesto', 'balance', 'sunat', 'economia', 'matematica financiera', 'excel'],
@@ -127,8 +127,8 @@ export const ROOMS: RoomMeta[] = [
   {
     id: 'comunicacion',
     label: 'Comunicación',
-    place: 'Set de televisión',
-    tagline: 'Luces, cámara y… ¡al aire!',
+    place: 'Estación de TV y radio',
+    tagline: 'Señal en vivo: luces, cámara y ¡al aire!',
     career: 'Ciencias de la Comunicación',
     keywords: ['comunicacion', 'periodis', 'audiovisual', 'radio', 'television', 'publicidad', 'fotografia', 'video', 'redes sociales', 'guion', 'cine', 'locucion'],
     bg: ['#1a1a1f', '#be123c'],
@@ -136,8 +136,8 @@ export const ROOMS: RoomMeta[] = [
   {
     id: 'educacion',
     label: 'Educación',
-    place: 'Aula de clases',
-    tagline: 'Pizarra, tiza y ganas de enseñar.',
+    place: 'Colegio',
+    tagline: 'Pizarra, libros y ganas de enseñar.',
     career: 'Educación',
     keywords: ['educacion', 'pedagog', 'docencia', 'didactica', 'aprendizaje', 'ensenanza', 'inicial', 'primaria', 'curriculo', 'aula', 'evaluacion educativa'],
     bg: ['#3d2b12', '#b45309'],
@@ -145,7 +145,7 @@ export const ROOMS: RoomMeta[] = [
   {
     id: 'tutoria',
     label: 'Conocimientos',
-    place: 'Sala de tutorías',
+    place: 'Plaza de tutorías',
     tagline: 'Enseña lo que dominas y aprende lo que te falta.',
     category: 'conocimientos',
     keywords: ['tutoria', 'asesoria', 'refuerzo', 'clases particulares', 'ayuda en'],
@@ -154,7 +154,7 @@ export const ROOMS: RoomMeta[] = [
   {
     id: 'biblioteca',
     label: 'Materiales',
-    place: 'Biblioteca Exchange UCV',
+    place: 'Gran biblioteca',
     tagline: 'Resúmenes, apuntes y presentaciones de todas las carreras.',
     category: 'materiales',
     keywords: ['biblioteca', 'libro', 'resumen', 'apuntes', 'separata', 'material'],
@@ -163,7 +163,7 @@ export const ROOMS: RoomMeta[] = [
   {
     id: 'investigacion',
     label: 'Investigación',
-    place: 'Laboratorio de investigación',
+    place: 'Campus de investigación',
     tagline: 'Ideas, experimentos y equipos para tu tesis.',
     category: 'investigacion',
     keywords: ['investigacion', 'tesis', 'laboratorio', 'quimica', 'biologia', 'ciencia', 'experimento', 'metodologia', 'articulo cientifico', 'proyecto de investigacion'],
@@ -171,7 +171,7 @@ export const ROOMS: RoomMeta[] = [
   },
 ];
 
-export const ROOM_BY_ID: Record<RoomId, RoomMeta> = Object.fromEntries(ROOMS.map((r) => [r.id, r])) as Record<RoomId, RoomMeta>;
+export const SCENE_BY_ID: Record<SceneId, SceneMeta> = Object.fromEntries(SCENES.map((r) => [r.id, r])) as Record<SceneId, SceneMeta>;
 
 const norm = (s: string) =>
   ' ' +
@@ -184,12 +184,12 @@ const norm = (s: string) =>
     .trim() +
   ' ';
 
-/** Puntaje de cada cuarto según el texto (cada palabra clave que empieza una palabra suma). */
-export function scoreText(text: string): { id: RoomId; score: number } | null {
+/** Puntaje de cada carrera según el texto (cada palabra clave que empieza una palabra suma). */
+export function scoreText(text: string): { id: SceneId; score: number } | null {
   const hay = norm(text);
   if (hay.trim().length < 3) return null;
-  let best: { id: RoomId; score: number } | null = null;
-  for (const r of ROOMS) {
+  let best: { id: SceneId; score: number } | null = null;
+  for (const r of SCENES) {
     let score = 0;
     r.keywords.forEach((k, i) => {
       // la primera palabra es el nombre de la carrera/sección: vale más
@@ -202,16 +202,16 @@ export function scoreText(text: string): { id: RoomId; score: number } | null {
   return best;
 }
 
-export function roomForCareer(career?: string): RoomId | null {
-  const r = ROOMS.find((x) => x.career && x.career === career);
+export function sceneForCareer(career?: string): SceneId | null {
+  const r = SCENES.find((x) => x.career && x.career === career);
   return r ? r.id : null;
 }
 
-/** Elige el cuarto para lo que la persona está buscando en el catálogo. */
-export function pickRoom(f: { searchQuery?: string; career?: string; category?: string; course?: string }): RoomId {
+/** Elige la escena para lo que la persona está buscando en el catálogo. */
+export function pickScene(f: { searchQuery?: string; career?: string; category?: string; course?: string }): SceneId {
   const byText = scoreText(f.searchQuery || '');
   if (byText) return byText.id;
-  const byCareer = f.career && f.career !== 'todas' ? roomForCareer(f.career) : null;
+  const byCareer = f.career && f.career !== 'todas' ? sceneForCareer(f.career) : null;
   if (byCareer) return byCareer;
   const byCourse = scoreText(f.course || '');
   if (byCourse) return byCourse.id;
