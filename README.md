@@ -24,6 +24,7 @@ Prototipo estudiantil para que estudiantes de la **Universidad César Vallejo** 
 | **Modo oscuro** | Botón en la esquina; todos los colores claros de la página tienen su versión oscura (revisado con una prueba automática de contraste en 36 pantallas). |
 | **Responder comentarios** | Debajo de cada comentario/valoración hay un botón **Responder**. Las respuestas muestran el nivel de quien responde y la etiqueta **Autor** si es quien publicó; cada uno puede borrar sus respuestas (y los admins cualquiera). Se guardan en la base de datos como colección aparte (`replies`), así no se pisan entre usuarios. |
 | **EXP y niveles** | Cada usuario gana EXP al publicar (+25), recibir valoraciones (+0 a +20 según las estrellas), ser destacado (+40), aceptar (+15) y completar intercambios (+30), valorar a otros (+5) y responder (+2, hasta 25 respuestas). Niveles: 1 Novato · 2 Aprendiz (60) · 3 Colaborador (150) · 4 Destacado (300) · 5 Experto (500) · 6 Mentor (800) · 7 Leyenda UCV (1200). Se ve en las tarjetas, comentarios, "Mi cuenta", el panel admin y el **Top colaboradores** del Inicio. La EXP se calcula siempre desde los datos, no se puede editar a mano. |
+| **Cuartos 3D por carrera** | Cada carrera tiene su propio cuarto 3D animado (Derecho: despacho con balanza y martillo; Ing. Civil: obra con grúa y muro que se construye; Sistemas: laboratorio con código en pantalla; Medicina: corazón latiendo y electrocardiograma; etc.) y cada sección también (Conocimientos: sala de tutorías; Materiales: biblioteca; Investigación: laboratorio). En el **Inicio** los cuartos van cambiando solos y se pueden elegir; en el **Catálogo** el cuarto cambia según lo que buscas o filtras ("derecho penal" → despacho jurídico). Hechos con three.js, sin modelos externos; se pausan fuera de pantalla y respetan "reducir movimiento". |
 | **Editar publicaciones** | El autor (y los administradores) tienen el botón **Editar publicación** en el detalle: se abre el mismo formulario con los datos cargados, se pueden quitar o agregar archivos, y queda la marca "editado el …" y el registro en el historial del admin. |
 | **Declaración de responsabilidad** | Antes de publicar, la persona acepta que es responsable de su contenido (autoría, citas, sin exámenes copiados, datos verídicos). |
 
@@ -91,4 +92,6 @@ server.ts              Servidor Express + endpoint de auditoría con Gemini
 - Bibliotecas y horarios: https://www.ucv.edu.pe/en/information-centers
 - Licenciamiento SUNEDU (Res. 077-2019-SUNEDU/CD): https://andina.pe/ingles/noticia-sunedu-otorga-licenciamiento-a-universidad-cesar-vallejo-norma-legal-y-graficos-755220.aspx
 
+> Los cuartos 3D usan [three.js](https://threejs.org) (licencia MIT), incluido en `public/vendor/three/`.
+>
 > El visor de PDF usa [pdf.js](https://github.com/mozilla/pdf.js) (Mozilla, licencia Apache 2.0), incluido en `public/vendor/pdfjs/`.

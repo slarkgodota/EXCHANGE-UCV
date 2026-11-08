@@ -6,6 +6,7 @@ import { HOW_IT_WORKS } from '../data/catalog';
 import { UCV_FACTS } from '../data/ucv';
 import { LIBRARY_RESOURCES } from '../data/library';
 import { TopContributors } from './TopContributors';
+import { HeroRooms } from './RoomShowcase';
 
 const SECTIONS = [
   { cat: 'conocimientos', icon: Users, title: 'Conocimientos', text: 'Ofrece ayuda en lo que dominas o pide apoyo para aprender.', tone: 'from-blue-500 to-indigo-600' },
@@ -29,22 +30,23 @@ export const Hero3D: React.FC = () => {
         <div aria-hidden className="blob-slow absolute -bottom-48 -left-32 w-[480px] h-[480px] rounded-full bg-blue-500/20 blur-3xl" />
         <div aria-hidden className="absolute inset-0 opacity-[0.06] bg-[radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] [background-size:24px_24px]" />
 
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-20 md:py-28 text-center">
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-16 md:py-24 grid lg:grid-cols-[1.05fr_1fr] gap-10 lg:gap-12 items-center">
+          <div className="text-center lg:text-left min-w-0">
           <p className="reveal-1 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs font-medium text-slate-200">
             <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
             Comparte · Aprende · Colabora
           </p>
-          <h1 className="reveal-2 font-display mt-6 text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-[1.02] text-balance">
+          <h1 className="reveal-2 font-display mt-6 text-5xl sm:text-6xl lg:text-[4.2rem] font-bold tracking-tight leading-[1.02] text-balance">
             {isLoggedIn && currentUser ? (
               <>Hola, {currentUser.name.split(' ')[0]}.<br /><span className="text-shine">¿Qué compartes hoy?</span></>
             ) : (
               <>Juntos <span className="text-shine">aprendemos</span> más.</>
             )}
           </h1>
-          <p className="reveal-3 mt-5 text-lg text-slate-300 max-w-xl mx-auto">
+          <p className="reveal-3 mt-5 text-lg text-slate-300 max-w-xl mx-auto lg:mx-0">
             Apuntes, asesorías entre pares y equipos de investigación para estudiantes de la UCV, en un solo lugar.
           </p>
-          <div className="reveal-4 mt-9 flex flex-wrap justify-center gap-3">
+          <div className="reveal-4 mt-9 flex flex-wrap justify-center lg:justify-start gap-3">
             <button
               type="button"
               onClick={() => goTo('catalogo')}
@@ -61,6 +63,8 @@ export const Hero3D: React.FC = () => {
               {isLoggedIn ? 'Publicar algo' : 'Crear cuenta gratis'}
             </button>
           </div>
+          </div>
+          <HeroRooms />
         </div>
       </section>
 

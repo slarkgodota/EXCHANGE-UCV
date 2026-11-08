@@ -222,3 +222,15 @@ html:not(.dark) .text-slate-400 { color: #6f7b90; }
 .medal-1, .dark .medal-1 { background-color: #fbbf24; color: #451a03; }
 .medal-2, .dark .medal-2 { background-color: #cbd5e1; color: #0f172a; }
 .medal-3, .dark .medal-3 { background-color: #fdba74; color: #431407; }
+
+/* ───────── Cuartos 3D ───────── */
+.room-canvas { touch-action: pan-y; }
+.room-title { animation: roomTitle 700ms cubic-bezier(.2,.8,.2,1) both; }
+@keyframes roomTitle { from { opacity: 0; transform: translateY(14px); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
+.room-progress { width: 0; animation-name: roomProgress; animation-timing-function: linear; animation-fill-mode: forwards; }
+@keyframes roomProgress { from { width: 0; } to { width: 100%; } }
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .room-title, .room-progress { animation: none; }
+}

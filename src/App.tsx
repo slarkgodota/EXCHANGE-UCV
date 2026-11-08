@@ -16,12 +16,21 @@ import { CampusSection } from './components/CampusSection';
 import { Footer } from './components/Footer';
 import { ThemeToggle } from './components/ThemeToggle';
 import { filterPublications } from './utils/exchangeLogic';
+import { RoomBanner } from './components/RoomShowcase';
+import { pickRoom } from './data/rooms';
 import { useView, goTo } from './utils/router';
 import { BookOpen, Plus, WifiOff } from 'lucide-react';
 
 const CatalogView: React.FC = () => {
   const { publications, filter, resetFilter, setIsCreateModalOpen, isLoggedIn, openAuth } = useExchange();
   const list = filterPublications(publications, filter);
+  // El cuarto 3D cambia según lo que se busca (con una pequeña espera para no cambiar en cada tecla)
+  const [roomFilter, setRoomFilter] = useState(filter);
+  useEffect(() => {
+    const id = window.setTimeout(() => setRoomFilter(filter), 450);
+    return () => window.clearTimeout(id);
+  }, [filter.searchQuery, filter.career, filter.category, filter.course]);
+  const room = pickRoom(roomFilter);
   const publish = () => (isLoggedIn ? setIsCreateModalOpen(true) : openAuth('register'));
 
   return (
@@ -39,6 +48,10 @@ const CatalogView: React.FC = () => {
           <Plus className="w-4 h-4" /> Publicar
         </button>
       </header>
+
+      <div className="reveal-2">
+        <RoomBanner room={room} count={list.length} />
+      </div>
 
       <div className="reveal-2">
         <CategoryFilterBar />
