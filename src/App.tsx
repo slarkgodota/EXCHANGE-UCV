@@ -39,9 +39,8 @@ const CatalogView: React.FC = () => {
     <div className="space-y-8">
       <header className="reveal-1 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          {active && <p key={active + '-k'} className="career-title text-xs font-bold uppercase tracking-[0.2em] text-red-700">Catálogo</p>}
-          <h1 key={active ?? 'none'} className="career-title font-display text-4xl sm:text-5xl font-bold text-slate-900 tracking-tight">{active ? SCENE_BY_ID[active].label : 'Catálogo'}</h1>
-          <p className="text-slate-500 mt-2">{active ? SCENE_BY_ID[active].tagline : 'Lo que comparten y buscan los estudiantes de la UCV.'}</p>
+          <h1 className="font-display text-4xl sm:text-5xl font-bold text-slate-900 tracking-tight">Catálogo</h1>
+          <p key={active ?? 'none'} className="career-title text-slate-500 mt-2">{active ? `Publicaciones de ${SCENE_BY_ID[active].career ?? SCENE_BY_ID[active].label}` : 'Lo que comparten y buscan los estudiantes de la UCV.'}</p>
         </div>
         <button
           type="button"

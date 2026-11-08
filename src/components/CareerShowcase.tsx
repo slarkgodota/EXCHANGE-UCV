@@ -1,23 +1,22 @@
 import React from 'react';
 import { useExchange } from '../context/ExchangeContext';
 import { SCENES, SCENE_BY_ID, SceneId } from '../data/careerScenes';
-import { buildScene } from '../three/scenes3d';
-import { Scene3D } from './Scene3D';
+import { CareerIllustration } from './CareerIllustration';
 
-/** Catálogo: escena 3D al aire libre de la carrera elegida. */
+/** Catálogo: ilustración animada de la carrera elegida. */
 export const CareerBanner: React.FC<{ scene: SceneId; count: number }> = ({ scene, count }) => {
   const meta = SCENE_BY_ID[scene];
   return (
     <section
-      className="on-dark relative h-64 sm:h-80 rounded-3xl overflow-hidden text-white transition-[background] duration-700"
+      className="on-dark relative h-[23rem] sm:h-80 rounded-3xl overflow-hidden text-white transition-[background] duration-700"
       style={{ background: `radial-gradient(130% 120% at 80% 30%, ${meta.bg[1]}, ${meta.bg[0]})` }}
       aria-label={`${meta.label}: ${meta.place}`}
     >
-      <Scene3D sceneKey={scene} factory={(T, o) => buildScene(T, scene, o)} align="right" zoom={1.35} className="absolute inset-0" />
-      <div className="absolute inset-0 pointer-events-none bg-gradient-to-t sm:bg-gradient-to-r from-black/75 via-black/30 to-transparent" />
+      <div className="absolute inset-0 sm:inset-y-0 sm:right-auto sm:w-[55%] pointer-events-none bg-gradient-to-t sm:bg-gradient-to-r from-black/70 via-black/25 to-transparent" />
+      <CareerIllustration scene={scene} />
       <div className="relative h-full flex flex-col justify-end p-5 sm:p-8 max-w-md pointer-events-none">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/75">{meta.label}</p>
-        <h2 key={scene} className="career-title font-display text-3xl sm:text-4xl font-bold leading-tight">{meta.place}</h2>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/75">{meta.career ? 'Carrera' : 'Categoría'}</p>
+        <h2 key={scene} className="career-title font-display text-3xl sm:text-4xl font-bold leading-tight">{meta.career ?? meta.label}</h2>
         <p className="text-sm text-white/85 mt-1">{meta.tagline}</p>
         <p className="mt-3 self-start inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur text-xs font-bold">
           {count} {count === 1 ? 'publicación' : 'publicaciones'}

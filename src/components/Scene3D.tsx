@@ -27,7 +27,7 @@ interface Engine {
 export const Scene3D: React.FC<{
   sceneKey: string;
   factory: SceneFactory;
-  view?: 'iso' | 'front';
+  view?: 'iso' | 'studio';
   align?: 'center' | 'right';
   lift?: number;
   zoom?: number;
@@ -70,6 +70,25 @@ export const Scene3D: React.FC<{
         host.current.appendChild(cv);
 
         const scene = new T.Scene();
+        // Entorno de estudio fotográfico (reflejos realistas para metal y vidrio)
+        if (cfg.current.view === 'studio') {
+          const pm = new T.PMREMGenerator(renderer);
+          const env = new T.Scene();
+          env.add(new T.Mesh(new T.BoxGeometry(20, 12, 20), new T.MeshStandardMaterial({ color: '#1b1f2a', side: T.BackSide })));
+          const panel = (w: number, h: number, x: number, y: number, z: number, ry: number, rx: number, k: number) => {
+            const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ color: new T.Color(k, k, k), side: T.DoubleSide }));
+            m.position.set(x, y, z);
+            m.rotation.set(rx, ry, 0);
+            env.add(m);
+          };
+          panel(8, 2.5, 0, 5.5, 0, 0, Math.PI / 2, 6); // luz cenital
+          panel(3, 6, -9.5, 1, 0, Math.PI / 2, 0, 3.5); // ventana izquierda
+          panel(3, 6, 9.5, 1, -2, -Math.PI / 2, 0, 2.2); // relleno derecho
+          panel(10, 1.2, 0, 2, -9.5, 0, 0, 1.6); // fondo
+          scene.environment = pm.fromScene(env, 0.035).texture;
+          env.traverse((o: any) => { o.geometry?.dispose(); o.material?.dispose(); });
+          pm.dispose();
+        }
         const camera = new T.PerspectiveCamera(30, 1, 0.1, 160);
         const hemi = new T.HemisphereLight('#ffffff', '#8b7355', 1.15);
         scene.add(hemi);
@@ -90,12 +109,12 @@ export const Scene3D: React.FC<{
           const w = e.w, h = e.h, aspect = w / h;
           camera.aspect = aspect;
           const tanV = Math.tan((camera.fov * Math.PI) / 360);
-          if (v === 'front') {
-            // altura visible ~5.6 (personajes de 2.1 + edificio); en pantallas angostas un poco más lejos
-            const H = (aspect < 1.2 ? 6.4 : 5.6) / zm;
-            const dist = H / 2 / tanV;
-            camera.position.set(0, 2.8, dist);
-            camera.lookAt(0, 1.75, 0);
+          if (v === 'studio') {
+            // vista de estudio: el emblema (~2.6 de alto) centrado, con aire alrededor
+            const H = 4.2 / zm;
+            const dist = Math.max(H / 2 / tanV, H / 2 / (tanV * aspect));
+            camera.position.set(0, 0.35, dist);
+            camera.lookAt(0, 0.05, 0);
             camera.clearViewOffset();
           } else {
             const right = al === 'right' && aspect > 2.0;
@@ -151,7 +170,8 @@ export const Scene3D: React.FC<{
             b.root.scale.setScalar(0.82 + 0.18 * k);
             b.props.forEach((p, i) => p.scale.setScalar(Math.max(0.001, reduce ? 1 : easeOutBack(clamp((e.intro - 0.35 - i * 0.06) / 0.45)))));
           } else {
-            b.root.rotation.y = e.pointer.x * 0.06;
+            b.root.rotation.y = e.pointer.x * 0.25;
+            b.root.rotation.x = e.pointer.y * 0.12;
           }
           for (const f of b.ticks) f(e.t, reduce ? 0 : dt);
           renderer.render(scene, camera);

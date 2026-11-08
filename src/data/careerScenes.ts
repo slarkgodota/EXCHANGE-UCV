@@ -1,9 +1,9 @@
 import type { CareerType, CategoryType } from '../types/exchange';
 
 /**
- * Escenas 3D de cada carrera (y de cada sección del catálogo).
- * Este archivo solo tiene los datos (nombre, carrera, palabras clave y colores);
- * los modelos 3D están en src/three/scenes3d.ts.
+ * Datos de cada carrera (y de cada sección del catálogo): nombre, carrera,
+ * palabras clave y colores. La ilustración animada está en
+ * src/components/CareerIllustration.tsx y los emblemas 3D del Inicio en src/three/emblems3d.ts.
  */
 export type SceneId =
   | 'derecho'
