@@ -89,6 +89,7 @@
     --container-lg: 32rem;
     --container-xl: 36rem;
     --container-2xl: 42rem;
+    --container-3xl: 48rem;
     --container-4xl: 56rem;
     --container-5xl: 64rem;
     --container-6xl: 72rem;
@@ -373,14 +374,23 @@
   .right-4 {
     right: calc(var(--spacing) * 4);
   }
+  .right-6 {
+    right: calc(var(--spacing) * 6);
+  }
   .-bottom-48 {
     bottom: calc(var(--spacing) * -48);
   }
   .bottom-0 {
     bottom: 0px;
   }
+  .bottom-3 {
+    bottom: calc(var(--spacing) * 3);
+  }
   .bottom-4 {
     bottom: calc(var(--spacing) * 4);
+  }
+  .bottom-6 {
+    bottom: calc(var(--spacing) * 6);
   }
   .-left-2 {
     left: calc(var(--spacing) * -2);
@@ -411,6 +421,9 @@
   }
   .z-\[70\] {
     z-index: 70;
+  }
+  .z-\[90\] {
+    z-index: 90;
   }
   .-mx-1 {
     margin-inline: calc(var(--spacing) * -1);
@@ -529,6 +542,9 @@
   .aspect-\[4\/3\] {
     aspect-ratio: 4/3;
   }
+  .aspect-\[16\/10\] {
+    aspect-ratio: 16/10;
+  }
   .h-1 {
     height: var(--spacing);
   }
@@ -598,6 +614,9 @@
   .h-full {
     height: 100%;
   }
+  .max-h-\[62vh\] {
+    max-height: 62vh;
+  }
   .max-h-\[80vh\] {
     max-height: 80vh;
   }
@@ -621,6 +640,9 @@
   }
   .w-2 {
     width: calc(var(--spacing) * 2);
+  }
+  .w-2\.5 {
+    width: calc(var(--spacing) * 2.5);
   }
   .w-3 {
     width: calc(var(--spacing) * 3);
@@ -682,6 +704,9 @@
   .max-w-2xl {
     max-width: var(--container-2xl);
   }
+  .max-w-3xl {
+    max-width: var(--container-3xl);
+  }
   .max-w-4xl {
     max-width: var(--container-4xl);
   }
@@ -690,6 +715,9 @@
   }
   .max-w-6xl {
     max-width: var(--container-6xl);
+  }
+  .max-w-\[42vw\] {
+    max-width: 42vw;
   }
   .max-w-full {
     max-width: 100%;
@@ -1561,6 +1589,9 @@
   .pt-6 {
     padding-top: calc(var(--spacing) * 6);
   }
+  .pr-1\.5 {
+    padding-right: calc(var(--spacing) * 1.5);
+  }
   .pr-3\.5 {
     padding-right: calc(var(--spacing) * 3.5);
   }
@@ -1709,6 +1740,10 @@
   .tracking-\[0\.2em\] {
     --tw-tracking: 0.2em;
     letter-spacing: 0.2em;
+  }
+  .tracking-\[0\.3em\] {
+    --tw-tracking: 0.3em;
+    letter-spacing: 0.3em;
   }
   .tracking-tight {
     --tw-tracking: var(--tracking-tight);
@@ -2240,6 +2275,22 @@
         background-color: color-mix(in oklab, var(--color-white) 20%, transparent);
       }
     }
+    .hover\:bg-white\/25:hover {
+      background-color: color-mix(in srgb, #fff 25%, transparent);
+    }
+    @supports (color: color-mix(in lab, red, red)) {
+      .hover\:bg-white\/25:hover {
+        background-color: color-mix(in oklab, var(--color-white) 25%, transparent);
+      }
+    }
+    .hover\:bg-white\/30:hover {
+      background-color: color-mix(in srgb, #fff 30%, transparent);
+    }
+    @supports (color: color-mix(in lab, red, red)) {
+      .hover\:bg-white\/30:hover {
+        background-color: color-mix(in oklab, var(--color-white) 30%, transparent);
+      }
+    }
     .hover\:from-red-500:hover {
       --tw-gradient-from: var(--color-red-500);
       --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
@@ -2347,6 +2398,12 @@
     }
   }
   @media (width >= 40rem) {
+    .sm\:bottom-5 {
+      bottom: calc(var(--spacing) * 5);
+    }
+    .sm\:left-5 {
+      left: calc(var(--spacing) * 5);
+    }
     .sm\:col-span-2 {
       grid-column: span 2 / span 2;
     }
@@ -2373,6 +2430,9 @@
     }
     .sm\:w-auto {
       width: auto;
+    }
+    .sm\:max-w-none {
+      max-width: none;
     }
     .sm\:grid-cols-2 {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3045,6 +3105,422 @@ html:not(.dark) .text-slate-400 {
   .room-title, .room-progress {
     animation: none;
   }
+}
+.room-backdrop {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  pointer-events: none;
+}
+.room-enter {
+  animation: roomEnterIn 380ms ease both;
+  transition: opacity 550ms ease, transform 550ms cubic-bezier(.5,0,.75,0);
+  cursor: pointer;
+}
+.room-enter.is-leaving {
+  opacity: 0;
+  transform: scale(1.18);
+}
+@keyframes roomEnterIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.room-enter-title {
+  animation: roomTitle 800ms cubic-bezier(.2,.8,.2,1) 250ms both;
+}
+.room-enter-kicker {
+  animation: roomTitle 800ms cubic-bezier(.2,.8,.2,1) 400ms both;
+}
+.room-bar {
+  animation: roomTitle 500ms ease both;
+}
+html[data-room] article.lift {
+  box-shadow: inset 0 4px 0 var(--r-accent);
+}
+html[data-room] article.lift:hover {
+  box-shadow: inset 0 4px 0 var(--r-accent), 0 18px 40px -18px var(--r-accent);
+  @supports (color: color-mix(in lab, red, red)) {
+    box-shadow: inset 0 4px 0 var(--r-accent), 0 18px 40px -18px color-mix(in srgb, var(--r-accent) 45%, transparent);
+  }
+}
+html[data-room] {
+  background: radial-gradient(120% 80% at 80% 0%, var(--r-page-2), var(--r-page) 60%) fixed;
+}
+html[data-room] body {
+  background: transparent;
+  color: var(--r-ink);
+}
+html[data-room] div.app-shell {
+  background: transparent;
+}
+html[data-room] .font-display {
+  font-family: var(--r-font);
+  letter-spacing: -0.01em;
+}
+html[data-room] header.sticky {
+  background-color: var(--r-surface);
+  @supports (color: color-mix(in lab, red, red)) {
+    background-color: color-mix(in srgb, var(--r-surface) 84%, transparent);
+  }
+  border-color: var(--r-border);
+}
+html[data-room] input, html[data-room] select, html[data-room] textarea {
+  background-color: var(--r-surface);
+  color: var(--r-ink);
+  border-color: var(--r-border);
+}
+html[data-room] select option {
+  background-color: var(--r-surface);
+  color: var(--r-ink);
+}
+html[data-room] .bg-\[\#0a1430\] {
+  background: linear-gradient(135deg, var(--r-hero-1), var(--r-hero-2));
+}
+html[data-room] .blob {
+  background-color: var(--r-accent2);
+  @supports (color: color-mix(in lab, red, red)) {
+    background-color: color-mix(in srgb, var(--r-accent2) 38%, transparent);
+  }
+}
+html[data-room] .blob-slow {
+  background-color: var(--r-accent);
+  @supports (color: color-mix(in lab, red, red)) {
+    background-color: color-mix(in srgb, var(--r-accent) 30%, transparent);
+  }
+}
+html[data-room] .text-shine {
+  background-image: linear-gradient(90deg, var(--r-accent2) 0%, #ffffff 25%, var(--r-accent2) 50%, #ffffff 75%, var(--r-accent2) 100%);
+}
+html[data-room] .bg-red-100 {
+  background-color: var(--r-tint);
+}
+html[data-room] .bg-red-400 {
+  background-color: var(--r-accent);
+}
+html[data-room] .bg-red-50 {
+  background-color: var(--r-tint);
+}
+html[data-room] .bg-red-50\/70 {
+  background-color: var(--r-tint);
+}
+html[data-room] .bg-red-50\/80 {
+  background-color: var(--r-tint);
+}
+html[data-room] .bg-red-500 {
+  background-color: var(--r-accent);
+}
+html[data-room] .bg-red-600 {
+  background-color: var(--r-accent);
+}
+html[data-room] .bg-red-600\/30 {
+  background-color: var(--r-accent);
+  @supports (color: color-mix(in lab, red, red)) {
+    background-color: color-mix(in srgb, var(--r-accent) 30%, transparent);
+  }
+}
+html[data-room] .bg-rose-100 {
+  background-color: var(--r-tint);
+}
+html[data-room] .bg-rose-50 {
+  background-color: var(--r-tint);
+}
+html[data-room] .bg-rose-600 {
+  background-color: var(--r-accent);
+}
+html[data-room] .bg-slate-100 {
+  background-color: var(--r-surface-3);
+}
+html[data-room] .bg-slate-100\/80 {
+  background-color: var(--r-surface-3);
+  @supports (color: color-mix(in lab, red, red)) {
+    background-color: color-mix(in srgb, var(--r-surface-3) 80%, transparent);
+  }
+}
+html[data-room] .bg-slate-200 {
+  background-color: var(--r-border);
+}
+html[data-room] .bg-slate-50 {
+  background-color: var(--r-surface-2);
+}
+html[data-room] .bg-slate-50\/80 {
+  background-color: var(--r-surface-2);
+  @supports (color: color-mix(in lab, red, red)) {
+    background-color: color-mix(in srgb, var(--r-surface-2) 80%, transparent);
+  }
+}
+html[data-room] .bg-slate-50\/90 {
+  background-color: var(--r-surface-2);
+  @supports (color: color-mix(in lab, red, red)) {
+    background-color: color-mix(in srgb, var(--r-surface-2) 90%, transparent);
+  }
+}
+html[data-room] .bg-slate-900 {
+  background-color: var(--r-hero-2);
+}
+html[data-room] .bg-white {
+  background-color: var(--r-surface);
+}
+html[data-room] .bg-white\/70 {
+  background-color: var(--r-surface);
+  @supports (color: color-mix(in lab, red, red)) {
+    background-color: color-mix(in srgb, var(--r-surface) 70%, transparent);
+  }
+}
+html[data-room] .bg-white\/80 {
+  background-color: var(--r-surface);
+  @supports (color: color-mix(in lab, red, red)) {
+    background-color: color-mix(in srgb, var(--r-surface) 80%, transparent);
+  }
+}
+html[data-room] .border-red-200 {
+  border-color: var(--r-accent);
+  @supports (color: color-mix(in lab, red, red)) {
+    border-color: color-mix(in srgb, var(--r-accent) 35%, var(--r-surface));
+  }
+}
+html[data-room] .border-red-300 {
+  border-color: var(--r-accent);
+  @supports (color: color-mix(in lab, red, red)) {
+    border-color: color-mix(in srgb, var(--r-accent) 35%, var(--r-surface));
+  }
+}
+html[data-room] .border-red-500 {
+  border-color: var(--r-accent);
+}
+html[data-room] .border-red-600 {
+  border-color: var(--r-accent);
+}
+html[data-room] .border-rose-100 {
+  border-color: var(--r-accent);
+  @supports (color: color-mix(in lab, red, red)) {
+    border-color: color-mix(in srgb, var(--r-accent) 35%, var(--r-surface));
+  }
+}
+html[data-room] .border-rose-200 {
+  border-color: var(--r-accent);
+  @supports (color: color-mix(in lab, red, red)) {
+    border-color: color-mix(in srgb, var(--r-accent) 35%, var(--r-surface));
+  }
+}
+html[data-room] .border-slate-100 {
+  border-color: var(--r-border);
+}
+html[data-room] .border-slate-200 {
+  border-color: var(--r-border);
+}
+html[data-room] .border-slate-200\/70 {
+  border-color: var(--r-border);
+  @supports (color: color-mix(in lab, red, red)) {
+    border-color: color-mix(in srgb, var(--r-border) 70%, transparent);
+  }
+}
+html[data-room] .border-slate-200\/80 {
+  border-color: var(--r-border);
+  @supports (color: color-mix(in lab, red, red)) {
+    border-color: color-mix(in srgb, var(--r-border) 80%, transparent);
+  }
+}
+html[data-room] .border-slate-200\/90 {
+  border-color: var(--r-border);
+  @supports (color: color-mix(in lab, red, red)) {
+    border-color: color-mix(in srgb, var(--r-border) 90%, transparent);
+  }
+}
+html[data-room] .border-slate-300 {
+  border-color: var(--r-border);
+}
+html[data-room] .divide-slate-100 > * + * {
+  border-color: var(--r-border);
+}
+html[data-room] .from-red-500 {
+  --tw-gradient-from: var(--r-accent);
+}
+html[data-room] .from-red-600 {
+  --tw-gradient-from: var(--r-accent);
+}
+html[data-room] .from-red-700 {
+  --tw-gradient-from: var(--r-accent);
+}
+html[data-room] .from-slate-50 {
+  --tw-gradient-from: var(--r-surface-2);
+}
+html[data-room] .group:hover .group-hover\:bg-red-600 {
+  background-color: var(--r-accent);
+}
+html[data-room] .group:hover .group-hover\:text-red-700 {
+  color: var(--r-accent-text);
+}
+html[data-room] .hover\:bg-red-100:hover {
+  background-color: var(--r-tint);
+}
+html[data-room] .hover\:bg-red-50:hover {
+  background-color: var(--r-tint);
+}
+html[data-room] .hover\:bg-red-50\/40:hover {
+  background-color: var(--r-tint);
+}
+html[data-room] .hover\:bg-red-500:hover {
+  background-color: var(--r-accent-hover);
+}
+html[data-room] .hover\:bg-red-600:hover {
+  background-color: var(--r-accent-hover);
+}
+html[data-room] .hover\:bg-red-700:hover {
+  background-color: var(--r-accent-hover);
+}
+html[data-room] .hover\:bg-slate-100:hover {
+  background-color: var(--r-surface-3);
+}
+html[data-room] .hover\:bg-slate-200:hover {
+  background-color: var(--r-border);
+}
+html[data-room] .hover\:bg-slate-200\/60:hover {
+  background-color: var(--r-border);
+  @supports (color: color-mix(in lab, red, red)) {
+    background-color: color-mix(in srgb, var(--r-border) 60%, transparent);
+  }
+}
+html[data-room] .hover\:bg-slate-50:hover {
+  background-color: var(--r-surface-2);
+}
+html[data-room] .hover\:bg-slate-50\/70:hover {
+  background-color: var(--r-surface-2);
+  @supports (color: color-mix(in lab, red, red)) {
+    background-color: color-mix(in srgb, var(--r-surface-2) 70%, transparent);
+  }
+}
+html[data-room] .hover\:bg-slate-800:hover {
+  background-color: var(--r-hero-1);
+}
+html[data-room] .hover\:bg-white:hover {
+  background-color: var(--r-surface);
+}
+html[data-room] .hover\:border-red-300:hover {
+  border-color: var(--r-accent);
+}
+html[data-room] .hover\:border-red-400:hover {
+  border-color: var(--r-accent);
+}
+html[data-room] .hover\:border-red-500:hover {
+  border-color: var(--r-accent);
+}
+html[data-room] .hover\:text-red-300:hover {
+  color: var(--r-accent2);
+}
+html[data-room] .hover\:text-red-600:hover {
+  color: var(--r-accent-text);
+}
+html[data-room] .hover\:text-red-700:hover {
+  color: var(--r-accent-text);
+}
+html[data-room] .hover\:text-slate-600:hover {
+  color: var(--r-muted);
+}
+html[data-room] .hover\:text-slate-700:hover {
+  color: var(--r-ink-2);
+}
+html[data-room] .hover\:text-slate-800:hover {
+  color: var(--r-ink);
+}
+html[data-room] .hover\:text-slate-900:hover {
+  color: var(--r-ink);
+}
+html[data-room] .ring-red-500\/20 {
+  --tw-ring-color: var(--r-accent);
+  @supports (color: color-mix(in lab, red, red)) {
+    --tw-ring-color: color-mix(in srgb, var(--r-accent) 45%, transparent);
+  }
+}
+html[data-room] .text-red-300 {
+  color: var(--r-accent2);
+}
+html[data-room] .text-red-400 {
+  color: var(--r-accent2);
+}
+html[data-room] .text-red-500 {
+  color: var(--r-accent-text);
+}
+html[data-room] .text-red-600 {
+  color: var(--r-accent-text);
+}
+html[data-room] .text-red-700 {
+  color: var(--r-accent-text);
+}
+html[data-room] .text-red-800 {
+  color: var(--r-accent-text);
+}
+html[data-room] .text-red-900 {
+  color: var(--r-accent-text);
+}
+html[data-room] .text-rose-700 {
+  color: var(--r-accent-text);
+}
+html[data-room] .text-rose-800 {
+  color: var(--r-accent-text);
+}
+html[data-room] .text-rose-900 {
+  color: var(--r-accent-text);
+}
+html[data-room] .text-slate-400 {
+  color: var(--r-muted-2);
+}
+html[data-room] .text-slate-500 {
+  color: var(--r-muted);
+}
+html[data-room] .text-slate-600 {
+  color: var(--r-muted);
+}
+html[data-room] .text-slate-700 {
+  color: var(--r-ink-2);
+}
+html[data-room] .text-slate-800 {
+  color: var(--r-ink);
+}
+html[data-room] .text-slate-900 {
+  color: var(--r-ink);
+}
+html[data-room] .to-rose-600 {
+  --tw-gradient-to: var(--r-accent-hover);
+}
+html[data-room] .to-rose-700 {
+  --tw-gradient-to: var(--r-accent-hover);
+}
+html[data-room] .to-slate-100\/60 {
+  --tw-gradient-to: var(--r-surface-3);
+}
+html[data-room] .via-rose-700 {
+  --tw-gradient-via: var(--r-accent-hover);
+}
+html[data-room] footer.text-slate-400, html[data-room] footer .text-slate-400 {
+  color: rgba(241, 245, 249, 0.84);
+}
+html[data-room] footer .text-slate-300 {
+  color: rgba(241, 245, 249, 0.92);
+}
+html[data-room] footer .text-red-500, html[data-room] footer .text-red-400, html[data-room] footer .text-red-300, html[data-room] .on-dark .text-red-400, html[data-room] .on-dark .text-red-300 {
+  color: var(--r-accent2);
+  @supports (color: color-mix(in lab, red, red)) {
+    color: color-mix(in srgb, var(--r-accent2) 45%, white);
+  }
+}
+html[data-room] .on-dark .text-slate-300 {
+  color: rgba(241, 245, 249, 0.9);
+}
+html[data-room] .on-dark .text-slate-500, html[data-room] .on-dark .text-slate-400 {
+  color: rgba(226, 232, 240, 0.75);
+}
+html[data-room] .lvl-gold {
+  background-image: linear-gradient(90deg, #fcd34d, #fbbf24);
+  color: #451a03;
+}
+html[data-room] .room-fade, html[data-room] .room-fade * {
+  transition: background-color .5s ease, color .5s ease, border-color .5s ease;
 }
 @property --tw-translate-x {
   syntax: "*";
