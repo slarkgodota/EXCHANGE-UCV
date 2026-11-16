@@ -8,6 +8,7 @@ import { getCampusLabel } from '../data/ucv';
 import { INTENT_LABELS } from '../data/catalog';
 import { Orcid } from './Orcid';
 import { LevelBadge } from './LevelBadge';
+import { UserLink } from './UserLink';
 
 const CAT = {
   materiales: { label: 'Materiales', cls: 'bg-red-50 text-red-700' },
@@ -58,7 +59,7 @@ export const PublicationCard: React.FC<{ publication: Publication; index?: numbe
           <Avatar name={p.author.name} src={p.author.avatar} size="sm" />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-slate-800 truncate flex items-center gap-1">
-              {p.author.name}
+              <UserLink userId={p.author.id} className="truncate">{p.author.name}</UserLink>
               {p.author.verified && <BadgeCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
             </p>
             <Orcid orcid={p.author.orcid} className="block" />

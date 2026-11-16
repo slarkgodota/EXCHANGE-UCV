@@ -135,3 +135,20 @@ export async function removeFiles(paths: string[]): Promise<void> {
 /** Nombre de archivo seguro para la ruta en el almacenamiento. */
 export const safeName = (name: string) =>
   name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9._-]+/g, '_').slice(-80);
+
+const encPath = (path: string) => path.split('/').map(encodeURIComponent).join('/');
+
+/** Dirección pública de un archivo del almacenamiento (el bucket es de lectura pública). */
+export const publicUrl = (path: string) => `${URL_BASE}/storage/v1/object/public/${BUCKET}/${encPath(path)}`;
+
+/** Si la URL es de nuestro almacenamiento, devuelve su ruta (para poder borrarlo). */
+export function pathFromPublicUrl(url?: string): string | null {
+  if (!url || !URL_BASE) return null;
+  const prefix = `${URL_BASE}/storage/v1/object/public/${BUCKET}/`;
+  if (!url.startsWith(prefix)) return null;
+  try {
+    return url.slice(prefix.length).split('?')[0].split('/').map(decodeURIComponent).join('/');
+  } catch {
+    return null;
+  }
+}

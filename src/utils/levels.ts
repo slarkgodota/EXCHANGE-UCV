@@ -73,22 +73,69 @@ export function levelFor(xp: number): Omit<LevelInfo, 'stats' | 'breakdown'> {
 
 const emptyStats = () => ({ publications: 0, ratingsReceived: 0, ratingSum: 0, exchanges: 0, reviewsWritten: 0, replies: 0, featured: 0, accepted: 0, completed: 0 });
 
-/** Calcula la EXP y el nivel de todos los usuarios de una sola vez. */
+// ───────────── Periodos de la clasificación ─────────────
+
+export type Period = 'total' | 'mes' | 'semana';
+
+export const PERIODS: { id: Period; label: string; short: string }[] = [
+  { id: 'total', label: 'Todo el tiempo', short: 'General' },
+  { id: 'mes', label: 'Este mes', short: 'Mes' },
+  { id: 'semana', label: 'Esta semana', short: 'Semana' },
+];
+
+/**
+ * Lee las fechas que guarda la app: "2026-11-16", "2026-11-16 14:30" (hora UTC) o ISO completo.
+ * Devuelve milisegundos, o NaN si no se puede leer.
+ */
+export function parseWhen(s?: string): number {
+  if (!s) return NaN;
+  const t = s.trim();
+  let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3], 12).getTime(); // solo día → mediodía local
+  m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/.exec(t);
+  if (m) return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+  return Date.parse(t);
+}
+
+/** Inicio del periodo (hora local): lunes 00:00 para la semana, día 1 para el mes. */
+export function periodStart(period: Period, now: Date = new Date()): number {
+  if (period === 'total') return -Infinity;
+  if (period === 'mes') return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dow = (d.getDay() + 6) % 7; // lunes = 0
+  d.setDate(d.getDate() - dow);
+  return d.getTime();
+}
+
+/** Cuándo se reinicia el periodo (para mostrar "se reinicia en 3 días"). */
+export function periodEnd(period: Period, now: Date = new Date()): number {
+  if (period === 'total') return Infinity;
+  if (period === 'mes') return new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
+  return periodStart('semana', now) + 7 * 86400000;
+}
+
+/** Calcula la EXP y el nivel de todos los usuarios de una sola vez.
+ *  Con `since` solo cuenta lo que pasó desde esa fecha (para la clasificación semanal/mensual). */
 export function computeAllLevels(
   publications: Publication[],
   requests: ExchangeRequest[],
-  replies: ReviewReply[]
+  replies: ReviewReply[],
+  since: number = -Infinity
 ): Record<string, LevelInfo> {
   const acc: Record<string, ReturnType<typeof emptyStats>> = {};
   const get = (id: string) => (acc[id] ||= emptyStats());
+  const all = since === -Infinity;
+  // Si una fecha no se puede leer solo cuenta en "Todo el tiempo".
+  const inRange = (when?: string) => all || parseWhen(when) >= since;
 
   for (const p of publications) {
     if (p.status === 'reportado' || p.status === 'en_revision') continue;
-    const a = get(p.author.id);
-    a.publications++;
-    if (p.status === 'destacado') a.featured++;
+    if (inRange(p.createdAt)) get(p.author.id).publications++;
+    if (p.status === 'destacado' && inRange(p.featuredAt || p.createdAt)) get(p.author.id).featured++;
     for (const r of p.reviews || []) {
       if (r.authorId === p.author.id) continue; // nadie gana EXP valorándose a sí mismo
+      if (!inRange(r.createdAt)) continue;
+      const a = get(p.author.id);
       a.ratingsReceived++;
       a.ratingSum += Math.max(1, Math.min(5, r.rating));
       get(r.authorId).reviewsWritten++;
@@ -96,13 +143,14 @@ export function computeAllLevels(
   }
   for (const q of requests) {
     if (q.senderId === q.receiverId) continue;
+    if (!inRange(q.respondedAt || q.createdAt)) continue;
     if (q.status === 'aceptada' || q.status === 'completada') get(q.receiverId).accepted++;
     if (q.status === 'completada') {
       get(q.receiverId).completed++;
       get(q.senderId).completed++;
     }
   }
-  for (const r of replies) get(r.authorId).replies++;
+  for (const r of replies) if (inRange(r.createdAt)) get(r.authorId).replies++;
 
   const out: Record<string, LevelInfo> = {};
   for (const [id, s] of Object.entries(acc)) {
@@ -131,6 +179,35 @@ export function computeAllLevels(
       breakdown,
     };
   }
+  return out;
+}
+
+export interface RankEntry {
+  userId: string;
+  rank: number;
+  xp: number;
+  info: LevelInfo;
+}
+
+/** Ordena a los usuarios por EXP (empates: mejor promedio de estrellas, luego más publicaciones).
+ *  Los empates exactos comparten puesto. */
+export function rankUsers(levels: Record<string, LevelInfo>, userIds?: string[]): RankEntry[] {
+  const ids = (userIds || Object.keys(levels)).filter((id) => levels[id] && levels[id].xp > 0);
+  const sorted = ids
+    .map((id) => ({ userId: id, xp: levels[id].xp, info: levels[id] }))
+    .sort(
+      (a, b) =>
+        b.xp - a.xp ||
+        b.info.stats.avgRating - a.info.stats.avgRating ||
+        b.info.stats.publications - a.info.stats.publications ||
+        (a.userId < b.userId ? -1 : 1)
+    );
+  const out: RankEntry[] = [];
+  sorted.forEach((e, i) => {
+    const prev = out[i - 1];
+    const tie = prev && prev.xp === e.xp && prev.info.stats.avgRating === e.info.stats.avgRating && prev.info.stats.publications === e.info.stats.publications;
+    out.push({ ...e, rank: tie ? prev.rank : i + 1 });
+  });
   return out;
 }
 

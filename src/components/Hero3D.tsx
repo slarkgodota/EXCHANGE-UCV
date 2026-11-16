@@ -5,7 +5,7 @@ import { goTo } from '../utils/router';
 import { HOW_IT_WORKS } from '../data/catalog';
 import { UCV_FACTS } from '../data/ucv';
 import { LIBRARY_RESOURCES } from '../data/library';
-import { TopContributors } from './TopContributors';
+import { TopContributors } from './Leaderboard';
 import { CareerEmblems } from './CareerEmblems';
 
 const SECTIONS = [

@@ -33,7 +33,7 @@ export const CareerEmblems: React.FC = () => {
         />
       </div>
       <div className="relative -mt-6 text-center" aria-live="polite">
-        <p key={e.id + 'k'} className="career-title text-[11px] font-bold uppercase tracking-[0.25em]" style={{ color: `color-mix(in srgb, ${e.accent} 55%, #ffffff)` }}>
+        <p key={e.id + 'k'} className="career-title text-[11px] font-bold uppercase tracking-[0.25em]" style={{ color: `color-mix(in srgb, ${e.accent} 25%, #ffffff)` }}>
           {e.kicker}
         </p>
         <h2 key={e.id + 't'} className="career-title font-display text-3xl sm:text-4xl font-bold text-white mt-1">{e.title}</h2>

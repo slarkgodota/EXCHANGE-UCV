@@ -25,9 +25,10 @@ import {
   ADMIN_EMAIL,
 } from '../data/initialData';
 import { calculateRatingDistribution } from '../utils/exchangeLogic';
-import { computeAllLevels, levelOf, LevelInfo } from '../utils/levels';
+import { computeAllLevels, levelOf, LevelInfo, Period, periodStart, rankUsers, RankEntry } from '../utils/levels';
+import { processImage, ImageKind } from '../utils/imageTools';
 import { putFile, deleteFile, clearFiles } from '../utils/fileStore';
-import { isRemoteEnabled, fetchAll, upsertRows, deleteRows, rpc, uploadFile, removeFiles, safeName, RemoteRow } from '../utils/remote';
+import { isRemoteEnabled, fetchAll, upsertRows, deleteRows, rpc, uploadFile, removeFiles, safeName, RemoteRow, publicUrl, pathFromPublicUrl } from '../utils/remote';
 
 const REMOTE = isRemoteEnabled();
 
@@ -147,6 +148,15 @@ interface ExchangeContextType {
   /** EXP y nivel de cada usuario (calculado de publicaciones, estrellas, intercambios y respuestas). */
   userLevels: Record<string, LevelInfo>;
   getUserLevel: (userId?: string) => LevelInfo;
+  /** EXP de cada usuario en el periodo (total, mes o semana). */
+  periodLevels: Record<Period, Record<string, LevelInfo>>;
+  /** Clasificación de usuarios existentes en el periodo. */
+  getRanking: (period: Period) => RankEntry[];
+  isProfileEditorOpen: boolean;
+  setIsProfileEditorOpen: (open: boolean) => void;
+  uploadProfileImage: (kind: ImageKind, file: File, focusY?: number) => Promise<ActionResult>;
+  /** Quita la foto o portada (la propia, o la de otro si eres administrador). */
+  removeProfileImage: (kind: ImageKind, userId?: string) => void;
   sendContactRequest: (data: {
     publicationId: string;
     publicationTitle: string;
@@ -169,7 +179,9 @@ interface ExchangeContextType {
   logoutUser: () => void;
   registerUser: (data: RegisterInput) => Promise<ActionResult>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<ActionResult>;
-  updateProfile: (data: Partial<Pick<StudentUser, 'name' | 'career' | 'campus' | 'cycle' | 'phone' | 'bio' | 'orcid'>>) => void;
+  updateProfile: (
+    data: Partial<Pick<StudentUser, 'name' | 'career' | 'campus' | 'cycle' | 'phone' | 'bio' | 'orcid' | 'interests' | 'links' | 'accent'>>
+  ) => void;
 
   roles: RoleDefinition[];
   createRole: (roleData: Omit<RoleDefinition, 'isSystem'>) => RoleDefinition;
@@ -234,7 +246,8 @@ export type ActivityType =
   | 'cambio_rol'
   | 'cuenta_creada_admin'
   | 'cuenta_eliminada'
-  | 'moderacion';
+  | 'moderacion'
+  | 'perfil';
 
 export interface ActivityEntry {
   id: string;
@@ -300,7 +313,7 @@ const celebrate = (opts: Record<string, unknown> = {}) => {
 };
 
 export function toPublicAuthor(u: StudentUser): PublicAuthor {
-  const { passwordHash, passwordSalt, phone, email, ...rest } = u;
+  const { passwordHash, passwordSalt, phone, email, cover, links, interests, accent, ...rest } = u;
   return rest;
 }
 
@@ -675,9 +688,75 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return { ok: true };
   };
 
+  /** Cambia datos de un usuario y actualiza la copia de su nombre/foto en publicaciones, comentarios y respuestas. */
+  const patchUser = (userId: string, data: Partial<StudentUser>) => {
+    const before = users.find((u) => u.id === userId);
+    if (!before) return;
+    const after = { ...before, ...data };
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, ...data } : u)));
+    const author = toPublicAuthor(after);
+    const touchesAuthor = (['name', 'avatar', 'career', 'campus', 'cycle', 'bio', 'orcid', 'verified'] as const).some((k) => k in data);
+    if (!touchesAuthor) return;
+    setPublications((prev) =>
+      prev.map((p) => {
+        const mine = p.author.id === userId;
+        const hasReview = p.reviews?.some((r) => r.authorId === userId);
+        if (!mine && !hasReview) return p;
+        return {
+          ...p,
+          author: mine ? { ...p.author, ...author, email: p.author.email } : p.author,
+          reviews: hasReview
+            ? p.reviews.map((r) => (r.authorId === userId ? { ...r, authorName: after.name, authorAvatar: after.avatar, authorCareer: after.career } : r))
+            : p.reviews,
+        };
+      })
+    );
+    setReplies((prev) =>
+      prev.some((r) => r.authorId === userId)
+        ? prev.map((r) => (r.authorId === userId ? { ...r, authorName: after.name, authorAvatar: after.avatar } : r))
+        : prev
+    );
+  };
+
   const updateProfile: ExchangeContextType['updateProfile'] = (data) => {
     if (!currentUser) return;
-    setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? { ...u, ...data } : u)));
+    patchUser(currentUser.id, data);
+  };
+
+  const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false);
+
+  const uploadProfileImage: ExchangeContextType['uploadProfileImage'] = async (kind, file, focusY = 0.5) => {
+    if (!currentUser) return { ok: false, error: 'Inicia sesión para cambiar tu perfil.' };
+    try {
+      const { blob, dataUrl } = await processImage(file, kind, focusY);
+      let url = dataUrl;
+      if (REMOTE) {
+        const ext = blob.type === 'image/webp' ? 'webp' : 'jpg';
+        const path = `perfiles/${safeName(currentUser.id)}/${kind}-${Date.now()}.${ext}`;
+        await uploadFile(path, blob);
+        url = publicUrl(path);
+      }
+      const old = pathFromPublicUrl(currentUser[kind]);
+      if (old) removeFiles([old]);
+      patchUser(currentUser.id, { [kind]: url } as Partial<StudentUser>);
+      log('perfil', kind === 'avatar' ? 'Cambió su foto de perfil' : 'Cambió la portada de su perfil');
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, error: e?.message || 'No se pudo subir la imagen.' };
+    }
+  };
+
+  const removeProfileImage: ExchangeContextType['removeProfileImage'] = (kind, userId) => {
+    if (!currentUser) return;
+    const targetId = userId || currentUser.id;
+    const isSelf = targetId === currentUser.id;
+    if (!isSelf && !isCreatorOrAdmin) return;
+    const target = users.find((u) => u.id === targetId);
+    if (!target) return;
+    const old = pathFromPublicUrl(target[kind]);
+    if (old) removeFiles([old]);
+    patchUser(targetId, { [kind]: undefined } as Partial<StudentUser>);
+    log('perfil', isSelf ? `Quitó su ${kind === 'avatar' ? 'foto' : 'portada'}` : `Quitó la ${kind === 'avatar' ? 'foto' : 'portada'} de ${target.name}`);
   };
 
   // ───────────── Gestión de usuarios (admin) ─────────────
@@ -881,7 +960,13 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const updatePublicationStatus = (pubId: string, status: Publication['status']) => {
     const up = publications.find((p) => p.id === pubId);
     if (up && up.status !== status) log('moderacion', `"${up.title}": ${up.status} → ${status}`);
-    setPublications((prev) => prev.map((p) => (p.id === pubId ? { ...p, status } : p)));
+    setPublications((prev) =>
+      prev.map((p) =>
+        p.id === pubId
+          ? { ...p, status, featuredAt: status === 'destacado' ? (p.status === 'destacado' ? p.featuredAt : new Date().toISOString()) : p.featuredAt }
+          : p
+      )
+    );
   };
 
   const deletePublication = (pubId: string) => {
@@ -927,6 +1012,32 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const userLevels = useMemo(() => computeAllLevels(publications, requests, replies), [publications, requests, replies]);
   const getUserLevel = (userId?: string) => levelOf(userLevels, userId);
+  // La semana y el mes cambian solos: se revisa cada 10 minutos.
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setClock(Date.now()), 10 * 60 * 1000);
+    return () => window.clearInterval(t);
+  }, []);
+  const monthStart = periodStart('mes', new Date(clock));
+  const weekStart = periodStart('semana', new Date(clock));
+  const periodLevels = useMemo<Record<Period, Record<string, LevelInfo>>>(
+    () => ({
+      total: userLevels,
+      mes: computeAllLevels(publications, requests, replies, monthStart),
+      semana: computeAllLevels(publications, requests, replies, weekStart),
+    }),
+    [userLevels, publications, requests, replies, monthStart, weekStart]
+  );
+  const userIds = useMemo(() => users.map((u) => u.id), [users]);
+  const rankings = useMemo(
+    () => ({
+      total: rankUsers(periodLevels.total, userIds),
+      mes: rankUsers(periodLevels.mes, userIds),
+      semana: rankUsers(periodLevels.semana, userIds),
+    }),
+    [periodLevels, userIds]
+  );
+  const getRanking = (period: Period) => rankings[period];
 
   const canDownload: ExchangeContextType['canDownload'] = (pub) => {
     if (!currentUser) return { allowed: false, reason: 'login' };
@@ -1026,7 +1137,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const updateRequestStatus = (requestId: string, status: ContactExchangeRequest['status']) => {
     const rq = requests.find((r) => r.id === requestId);
     if (rq) log('solicitud_respondida', `Solicitud de ${rq.senderName} sobre "${rq.publicationTitle}": ${status}`);
-    setRequests((prev) => prev.map((r) => (r.id === requestId ? { ...r, status } : r)));
+    setRequests((prev) => prev.map((r) => (r.id === requestId ? { ...r, status, respondedAt: new Date().toISOString() } : r)));
   };
 
   // ───────────── Reportes ─────────────
@@ -1125,6 +1236,12 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         deleteReply,
         userLevels,
         getUserLevel,
+        periodLevels,
+        getRanking,
+        isProfileEditorOpen,
+        setIsProfileEditorOpen,
+        uploadProfileImage,
+        removeProfileImage,
         sendContactRequest,
         updateRequestStatus,
         reportPublication,

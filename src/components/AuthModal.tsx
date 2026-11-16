@@ -17,6 +17,8 @@ import {
   Phone,
   CheckCircle2,
   BadgeCheck,
+  UserRound,
+  Pencil,
 } from 'lucide-react';
 import { useExchange, AuthMode } from '../context/ExchangeContext';
 import { CAREERS, UCV_CAMPUSES } from '../data/ucv';
@@ -25,7 +27,8 @@ import { Avatar } from './Avatar';
 import { Orcid, isValidOrcid } from './Orcid';
 import { LevelCard, LevelBadge } from './LevelBadge';
 
-const CYCLES = ['Ciclo I', 'Ciclo II', 'Ciclo III', 'Ciclo IV', 'Ciclo V', 'Ciclo VI', 'Ciclo VII', 'Ciclo VIII', 'Ciclo IX', 'Ciclo X', 'Egresado', 'Docente'];
+import { CYCLES } from '../data/profile';
+import { goToProfile } from '../utils/router';
 
 const inputBase =
   'w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-red-500/40 focus:border-red-500 focus:outline-none transition';
@@ -271,7 +274,7 @@ const RegisterForm: React.FC<{ onSwitch: (m: AuthMode) => void }> = ({ onSwitch 
 };
 
 const AccountPanel: React.FC = () => {
-  const { currentUser, getRoleById, logoutUser, changePassword, updateProfile } = useExchange();
+  const { currentUser, getRoleById, logoutUser, changePassword, setIsAuthModalOpen, setIsProfileEditorOpen } = useExchange();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -302,45 +305,30 @@ const AccountPanel: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 text-xs">
-        <label className="block">
-          <span className={labelBase}>Campus</span>
-          <select
-            value={currentUser.campus}
-            onChange={(e) => updateProfile({ campus: e.target.value as CampusType })}
-            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
-          >
-            {UCV_CAMPUSES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-          </select>
-        </label>
-        <label className="block">
-          <span className={labelBase}>Carrera</span>
-          <select
-            value={currentUser.career}
-            onChange={(e) => updateProfile({ career: e.target.value as CareerType })}
-            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
-          >
-            {CAREERS.map((c) => <option key={c}>{c}</option>)}
-          </select>
-        </label>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setIsAuthModalOpen(false);
+            goToProfile(currentUser.id);
+          }}
+          className="inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs"
+        >
+          <UserRound className="w-4 h-4" /> Ver mi perfil
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setIsAuthModalOpen(false);
+            setIsProfileEditorOpen(true);
+          }}
+          className="inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-200 hover:border-slate-400 text-slate-700 font-bold text-xs"
+        >
+          <Pencil className="w-4 h-4" /> Editar perfil
+        </button>
       </div>
 
       <LevelCard userId={currentUser.id} />
-
-      <label className="block text-xs">
-        <span className={labelBase}>ORCID <span className="font-normal text-slate-400">(opcional)</span></span>
-        <input
-          id="acc-orcid"
-          defaultValue={currentUser.orcid || ''}
-          placeholder="0000-0000-0000-0000"
-          onBlur={(e) => {
-            const v = e.target.value.trim().replace(/^https?:\/\/(www\.)?orcid\.org\//, '');
-            if (v === '' || isValidOrcid(v)) updateProfile({ orcid: v || undefined });
-            else e.target.value = currentUser.orcid || '';
-          }}
-          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
-        />
-      </label>
 
       <form onSubmit={submit} className="space-y-3 pt-4 border-t border-slate-100">
         <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">

@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useExchange } from '../context/ExchangeContext';
 import { calculateRatingDistribution, isSafeHttpUrl } from '../utils/exchangeLogic';
+import { UserLink } from './UserLink';
 import { Avatar } from './Avatar';
 import { AttachmentList } from './AttachmentList';
 import { getCampusLabel } from '../data/ucv';
@@ -364,7 +365,7 @@ export const PublicationDetailModal: React.FC = () => {
                 <Avatar name={pub.author.name} src={pub.author.avatar} size="lg" />
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <h4 className="font-bold text-slate-900 text-base">{pub.author.name}</h4>
+                    <h4 className="font-bold text-slate-900 text-base"><UserLink userId={pub.author.id}>{pub.author.name}</UserLink></h4>
                     <Orcid orcid={pub.author.orcid} />
                     {pub.author.verified && (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full">
@@ -557,22 +558,12 @@ export const PublicationDetailModal: React.FC = () => {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        {rev.authorAvatar ? (
-                          <img
-                            src={rev.authorAvatar}
-                            alt={rev.authorName}
-                            className="w-7 h-7 rounded-full object-cover border border-slate-200"
-                          />
-                        ) : (
-                          <div className="w-7 h-7 rounded-full bg-red-100 text-red-700 font-bold text-xs flex items-center justify-center">
-                            {rev.authorName.charAt(0)}
-                          </div>
-                        )}
+                        <Avatar name={rev.authorName} src={rev.authorAvatar} size="xs" className="w-7 h-7" />
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-bold text-slate-800">
+                            <UserLink userId={rev.authorId} className="text-xs font-bold text-slate-800">
                               {rev.authorName}
-                            </span>
+                            </UserLink>
                             <OrcidFor userId={rev.authorId} />
                             <LevelBadge userId={rev.authorId} showName={false} />
                             {rev.verifiedExchange && (

@@ -29,6 +29,7 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
   cuenta_creada_admin: 'Cuenta creada por admin',
   cuenta_eliminada: 'Cuenta eliminada',
   moderacion: 'Moderación',
+  perfil: 'Perfil',
 };
 
 const ACTIVITY_TONE: Partial<Record<ActivityType, string>> = {

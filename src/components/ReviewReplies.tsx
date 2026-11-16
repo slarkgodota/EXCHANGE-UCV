@@ -3,6 +3,7 @@ import { CornerDownRight, MessageCircle, Send, Trash2 } from 'lucide-react';
 import { useExchange } from '../context/ExchangeContext';
 import { Publication, Review } from '../types/exchange';
 import { LevelBadge } from './LevelBadge';
+import { UserLink } from './UserLink';
 
 const when = (iso: string) => {
   const d = new Date(iso);
@@ -42,7 +43,7 @@ export const ReviewReplies: React.FC<{ pub: Publication; review: Review }> = ({ 
               <li key={r.id} className="text-xs">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <CornerDownRight className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="font-bold text-slate-800">{r.authorName}</span>
+                  <UserLink userId={r.authorId} className="font-bold text-slate-800">{r.authorName}</UserLink>
                   {isPubAuthor && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">Autor</span>}
                   <LevelBadge userId={r.authorId} showName={false} />
                   <span className="text-[10px] text-slate-400">{when(r.createdAt)}</span>

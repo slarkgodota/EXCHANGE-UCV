@@ -1,5 +1,6 @@
 import React from 'react';
 import { getInitials } from '../utils/security';
+import { safeImageSrc } from '../utils/imageTools';
 
 const PALETTE = [
   'bg-red-100 text-red-700',
@@ -21,6 +22,8 @@ const SIZES = {
   sm: 'w-8 h-8 text-xs',
   md: 'w-10 h-10 text-sm',
   lg: 'w-14 h-14 text-lg',
+  xl: 'w-20 h-20 text-2xl',
+  '2xl': 'w-28 h-28 sm:w-32 sm:h-32 text-4xl',
 };
 
 interface AvatarProps {
@@ -32,10 +35,14 @@ interface AvatarProps {
 
 /** Foto del usuario si existe; si no, sus iniciales. Nunca usa fotos de stock. */
 export const Avatar: React.FC<AvatarProps> = ({ name, src, size = 'sm', className = '' }) => {
-  if (src) {
+  const [broken, setBroken] = React.useState(false);
+  const safe = broken ? undefined : safeImageSrc(src);
+  if (safe) {
     return (
       <img
-        src={src}
+        src={safe}
+        loading="lazy"
+        onError={() => setBroken(true)}
         alt={name}
         className={`${SIZES[size]} rounded-full object-cover border border-white shadow-xs shrink-0 ${className}`}
       />

@@ -1,33 +1,46 @@
 import { useEffect, useState } from 'react';
 
-/** Vistas de la plataforma. Cada una se muestra por separado. */
-export const VIEWS = ['inicio', 'catalogo', 'biblioteca', 'sedes'] as const;
-export type View = (typeof VIEWS)[number];
+import { VIEWS, View, Route, parseHash } from './routes';
+export { VIEWS, parseHash };
+export type { View, Route };
 
-const readView = (): View => {
-  if (typeof window === 'undefined') return 'inicio';
-  const h = window.location.hash.replace('#', '') as View;
-  return (VIEWS as readonly string[]).includes(h) ? h : 'inicio';
-};
+const readRoute = (): Route => (typeof window === 'undefined' ? { view: 'inicio' } : parseHash(window.location.hash));
 
 /** Navega a una vista usando el hash de la URL (#catalogo, #biblioteca…). */
-export function goTo(view: View) {
-  if (readView() === view) {
+export function goTo(view: Exclude<View, 'perfil'>) {
+  if (readRoute().view === view) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     return;
   }
   window.location.hash = view;
 }
 
-export function useView(): View {
-  const [view, setView] = useState<View>(readView);
+/** Abre el perfil público de un usuario (#perfil/<id>). */
+export function goToProfile(userId: string) {
+  const target = `perfil/${encodeURIComponent(userId)}`;
+  if (window.location.hash.replace(/^#/, '') === target) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+  window.location.hash = target;
+}
+
+export const profileUrl = (userId: string) =>
+  `${window.location.origin}${window.location.pathname}#perfil/${encodeURIComponent(userId)}`;
+
+export function useRoute(): Route {
+  const [route, setRoute] = useState<Route>(readRoute);
   useEffect(() => {
     const onHash = () => {
-      setView(readView());
+      setRoute(readRoute());
       window.scrollTo({ top: 0 });
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
-  return view;
+  return route;
+}
+
+export function useView(): View {
+  return useRoute().view;
 }

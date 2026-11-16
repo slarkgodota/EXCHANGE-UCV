@@ -107,6 +107,7 @@ html.dark body { background-color: #0b1220; color: #e2e8f0; }
 .dark .bg-slate-50\/90 { background-color: rgba(15, 23, 41, 0.90); }
 .dark .bg-violet-100 { background-color: rgba(139, 92, 246, 0.22); }
 .dark .bg-white { background-color: rgb(19, 28, 46); }
+.dark .ring-white { --tw-ring-color: rgb(19, 28, 46); }
 .dark .bg-white\/80 { background-color: rgba(19, 28, 46, 0.80); }
 .dark .border-amber-200 { border-color: rgba(148, 163, 184, 0.28); }
 .dark .border-blue-100 { border-color: rgba(148, 163, 184, 0.28); }

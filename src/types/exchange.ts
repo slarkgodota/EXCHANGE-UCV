@@ -50,10 +50,18 @@ export interface StudentUser {
   passwordHash: string;
   passwordSalt: string;
   createdAt?: string;
+  /** Portada del perfil (URL https o imagen comprimida). */
+  cover?: string;
+  /** Color elegido para el perfil (uno de PROFILE_ACCENTS). */
+  accent?: string;
+  /** Intereses o habilidades que muestra en su perfil (máx. 8). */
+  interests?: string[];
+  /** Enlaces públicos (LinkedIn, GitHub, portafolio…), máx. 3, solo http(s). */
+  links?: string[];
 }
 
 /** Datos públicos del autor que se copian en cada publicación (sin credenciales). */
-export type PublicAuthor = Omit<StudentUser, 'passwordHash' | 'passwordSalt' | 'phone' | 'email'> & {
+export type PublicAuthor = Omit<StudentUser, 'passwordHash' | 'passwordSalt' | 'phone' | 'email' | 'cover' | 'links' | 'interests' | 'accent'> & {
   email?: string;
 };
 
@@ -107,6 +115,8 @@ export interface Publication {
   createdAt: string;
   /** Fecha de la última edición del autor. */
   updatedAt?: string;
+  /** Cuándo un admin la marcó como destacada (para la clasificación por periodo). */
+  featuredAt?: string;
   status: 'aprobado' | 'en_revision' | 'destacado' | 'reportado';
   ratingAverage: number;
   ratingCount: number;
@@ -142,6 +152,8 @@ export interface ContactExchangeRequest {
   proposedExchange: string; // What the student offers in return (e.g. Apuntes de Física, tutoría en cálculo, etc.)
   status: 'pendiente' | 'aceptada' | 'rechazada' | 'completada';
   createdAt: string;
+  /** Cuándo cambió de estado por última vez (aceptada / completada). */
+  respondedAt?: string;
 }
 
 export interface PlagiarismReport {

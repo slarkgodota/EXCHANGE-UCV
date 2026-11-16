@@ -20,7 +20,10 @@ import { CareerBanner, CareerPicker } from './components/CareerShowcase';
 import { CareerTheme } from './components/CareerTheme';
 import { activeCareerFor } from './data/careerThemes';
 import { SCENE_BY_ID } from './data/careerScenes';
-import { useView, goTo } from './utils/router';
+import { useRoute, goTo } from './utils/router';
+import { RankingView } from './components/Leaderboard';
+import { ProfileView } from './components/ProfileView';
+import { EditProfileModal } from './components/EditProfileModal';
 import { BookOpen, Plus, WifiOff } from 'lucide-react';
 
 const CatalogView: React.FC = () => {
@@ -99,7 +102,8 @@ const CatalogView: React.FC = () => {
 };
 
 const ExchangePortal: React.FC = () => {
-  const view = useView();
+  const route = useRoute();
+  const view = route.view;
   const { syncStatus, syncError } = useExchange();
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   useEffect(() => {
@@ -131,7 +135,7 @@ const ExchangePortal: React.FC = () => {
       )}
       <Navbar view={view} />
 
-      <main key={view} className="flex-1 w-full view-enter">
+      <main key={view + (route.param || '')} className="flex-1 w-full view-enter">
         {view === 'inicio' ? (
           <Hero3D />
         ) : (
@@ -139,6 +143,8 @@ const ExchangePortal: React.FC = () => {
             {view === 'catalogo' && <CatalogView />}
             {view === 'biblioteca' && <LibrarySection />}
             {view === 'sedes' && <CampusSection />}
+            {view === 'ranking' && <RankingView />}
+            {view === 'perfil' && route.param && <ProfileView userId={route.param} />}
           </div>
         )}
       </main>
@@ -152,6 +158,7 @@ const ExchangePortal: React.FC = () => {
       <AdminPanelModal />
       <ProjectInfoModal />
       <AuthModal />
+      <EditProfileModal />
       <ThemeToggle />
     </div>
   );

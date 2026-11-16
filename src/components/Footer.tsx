@@ -24,6 +24,7 @@ export const Footer: React.FC = () => {
         <nav className="flex flex-col gap-2" aria-label="Pie de página">
           <button type="button" onClick={() => goTo('catalogo')} className="text-left hover:text-white">Catálogo</button>
           <button type="button" onClick={() => goTo('biblioteca')} className="text-left hover:text-white">Biblioteca</button>
+          <button type="button" onClick={() => goTo('ranking')} className="text-left hover:text-white">Ranking</button>
           <button type="button" onClick={() => goTo('sedes')} className="text-left hover:text-white">Sedes UCV</button>
           <button type="button" onClick={() => setIsProjectInfoModalOpen(true)} className="text-left hover:text-white">Sobre el proyecto</button>
         </nav>

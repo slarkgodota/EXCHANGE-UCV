@@ -4,10 +4,12 @@ import { useExchange } from '../context/ExchangeContext';
 import { Avatar } from './Avatar';
 import { goTo, View } from '../utils/router';
 
-const LINKS: { view: View; label: string }[] = [
+type NavView = Exclude<View, 'perfil'>;
+const LINKS: { view: NavView; label: string }[] = [
   { view: 'inicio', label: 'Inicio' },
   { view: 'catalogo', label: 'Catálogo' },
   { view: 'biblioteca', label: 'Biblioteca' },
+  { view: 'ranking', label: 'Ranking' },
   { view: 'sedes', label: 'Sedes' },
 ];
 
@@ -29,7 +31,7 @@ export const Navbar: React.FC<{ view: View }> = ({ view }) => {
     ? requests.filter((r) => r.receiverId === currentUser.id && r.status === 'pendiente').length
     : 0;
 
-  const nav = (v: View) => {
+  const nav = (v: NavView) => {
     setOpen(false);
     goTo(v);
   };
