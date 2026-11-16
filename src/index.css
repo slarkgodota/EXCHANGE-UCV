@@ -385,3 +385,9 @@ html[data-career] .lvl-gold { background-image: linear-gradient(90deg, #fcd34d, 
   .ill-stage * { animation: none !important; }
   .ill-draw *, .ill-stroke { stroke-dashoffset: 0; }
 }
+
+/* Página de perfil: entra como una página nueva (deslizándose) */
+.profile-enter { animation: profileIn 0.45s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes profileIn { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+.dark .bg-slate-50\/90 { background-color: rgba(11, 18, 32, 0.9); }
+@media (prefers-reduced-motion: reduce) { .profile-enter { animation: none; } }

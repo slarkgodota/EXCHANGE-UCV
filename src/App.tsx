@@ -22,7 +22,7 @@ import { activeCareerFor } from './data/careerThemes';
 import { SCENE_BY_ID } from './data/careerScenes';
 import { useRoute, goTo } from './utils/router';
 import { RankingView } from './components/Leaderboard';
-import { ProfileView } from './components/ProfileView';
+import { ProfilePage } from './components/ProfileView';
 import { EditProfileModal } from './components/EditProfileModal';
 import { BookOpen, Plus, WifiOff } from 'lucide-react';
 
@@ -119,7 +119,7 @@ const ExchangePortal: React.FC = () => {
 
   return (
     <div className="app-shell min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-red-500 selection:text-white">
-      <CareerTheme />
+      <CareerTheme off={view === 'perfil'} />
       {!isOnline && (
         <div className="bg-amber-500 text-amber-950 text-xs font-bold py-2 px-4 flex items-center justify-center gap-2">
           <WifiOff className="w-4 h-4" /> Sin conexión: puedes ver lo guardado en este dispositivo.
@@ -133,23 +133,30 @@ const ExchangePortal: React.FC = () => {
       {syncStatus === 'loading' && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-slate-900 text-white text-xs shadow-lg">Cargando publicaciones…</div>
       )}
-      <Navbar view={view} />
+      {view === 'perfil' && route.param ? (
+        <div key={'perfil-' + route.param} className="flex-1 w-full profile-enter">
+          <ProfilePage userId={route.param} tab={route.tab} />
+        </div>
+      ) : (
+        <>
+        <Navbar view={view} />
 
-      <main key={view + (route.param || '')} className="flex-1 w-full view-enter">
-        {view === 'inicio' ? (
-          <Hero3D />
-        ) : (
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 md:py-16">
-            {view === 'catalogo' && <CatalogView />}
-            {view === 'biblioteca' && <LibrarySection />}
-            {view === 'sedes' && <CampusSection />}
-            {view === 'ranking' && <RankingView />}
-            {view === 'perfil' && route.param && <ProfileView userId={route.param} />}
-          </div>
-        )}
-      </main>
+        <main key={view + (route.param || '')} className="flex-1 w-full view-enter">
+          {view === 'inicio' ? (
+            <Hero3D />
+          ) : (
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 md:py-16">
+              {view === 'catalogo' && <CatalogView />}
+              {view === 'biblioteca' && <LibrarySection />}
+              {view === 'sedes' && <CampusSection />}
+              {view === 'ranking' && <RankingView />}
+            </div>
+          )}
+        </main>
 
-      <Footer />
+        <Footer />
+        </>
+      )}
 
       <PublicationDetailModal />
       <CreatePublicationModal />

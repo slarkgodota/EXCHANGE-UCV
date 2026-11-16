@@ -296,7 +296,7 @@ const CareerBackdrop: React.FC<{ career: SceneId; colors: { a: string; b: string
  * Cuando la persona elige una carrera o categoría (o la busca), toda la página toma
  * los colores, la letra y el fondo animado de esa carrera. Al volver a "Todas", se ve normal.
  */
-export const CareerTheme: React.FC = () => {
+export const CareerTheme: React.FC<{ off?: boolean }> = ({ off = false }) => {
   const { filter } = useExchange();
   const [career, setCareer] = useState<SceneId | null>(null);
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
@@ -304,11 +304,11 @@ export const CareerTheme: React.FC = () => {
 
   // Carrera según el filtro (la búsqueda espera un poco para no cambiar en cada tecla)
   useEffect(() => {
-    const target = activeCareerFor(filter);
+    const target = off ? null : activeCareerFor(filter);
     const wait = filter.searchQuery && target ? 700 : 0;
     const id = window.setTimeout(() => setCareer(target), wait);
     return () => window.clearTimeout(id);
-  }, [filter.searchQuery, filter.career, filter.category]);
+  }, [filter.searchQuery, filter.career, filter.category, off]);
 
   // Seguir el modo claro/oscuro
   useEffect(() => {
