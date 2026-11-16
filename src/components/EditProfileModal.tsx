@@ -1,12 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { X, Camera, ImagePlus, Trash2, Loader2, Plus, Check, Lock } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, Plus, Check, Lock } from 'lucide-react';
 import { useExchange } from '../context/ExchangeContext';
-import { Avatar } from './Avatar';
-import { ProfileCover } from './ProfileView';
+import { CoverPicker, AvatarPicker } from './ImagePickers';
 import { isValidOrcid } from './Orcid';
 import { CAREERS, UCV_CAMPUSES } from '../data/ucv';
 import { CYCLES, PROFILE_ACCENTS, PROFILE_LIMITS, cleanInterests, normalizeLink } from '../data/profile';
-import { checkImageFile, IMAGE_TYPES } from '../utils/imageTools';
 import type { CampusType, CareerType } from '../types/exchange';
 
 const label = 'block text-xs font-bold text-slate-700 mb-1.5';
@@ -14,7 +12,7 @@ const input = 'w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white 
 
 /** Modal "Editar perfil": foto, portada, datos, intereses, enlaces y color. */
 export const EditProfileModal: React.FC = () => {
-  const { isProfileEditorOpen, setIsProfileEditorOpen, currentUser, updateProfile, uploadProfileImage, removeProfileImage } = useExchange();
+  const { isProfileEditorOpen, setIsProfileEditorOpen, currentUser, updateProfile, removeProfileImage } = useExchange();
   const open = isProfileEditorOpen && !!currentUser;
 
   const [name, setName] = useState('');
@@ -30,11 +28,6 @@ export const EditProfileModal: React.FC = () => {
   const [accent, setAccent] = useState<string | undefined>(undefined);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [imgError, setImgError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<'avatar' | 'cover' | null>(null);
-  const [pendingCover, setPendingCover] = useState<{ file: File; url: string } | null>(null);
-  const [focusY, setFocusY] = useState(0.5);
-  const avatarInput = useRef<HTMLInputElement>(null);
-  const coverInput = useRef<HTMLInputElement>(null);
 
   // Cargar los datos actuales cada vez que se abre
   useEffect(() => {
@@ -53,7 +46,6 @@ export const EditProfileModal: React.FC = () => {
     setAccent(currentUser.accent);
     setErrors({});
     setImgError(null);
-    setPendingCover(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -64,40 +56,9 @@ export const EditProfileModal: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  useEffect(() => () => { if (pendingCover) URL.revokeObjectURL(pendingCover.url); }, [pendingCover]);
-
   if (!open || !currentUser) return null;
 
   const close = () => setIsProfileEditorOpen(false);
-
-  const pickAvatar = async (file?: File) => {
-    if (!file) return;
-    const err = checkImageFile(file);
-    if (err) return setImgError(err);
-    setImgError(null);
-    setBusy('avatar');
-    const res = await uploadProfileImage('avatar', file);
-    setBusy(null);
-    if (!res.ok) setImgError(res.error || 'No se pudo subir la foto.');
-  };
-
-  const pickCover = (file?: File) => {
-    if (!file) return;
-    const err = checkImageFile(file);
-    if (err) return setImgError(err);
-    setImgError(null);
-    setFocusY(0.5);
-    setPendingCover({ file, url: URL.createObjectURL(file) });
-  };
-
-  const saveCover = async () => {
-    if (!pendingCover) return;
-    setBusy('cover');
-    const res = await uploadProfileImage('cover', pendingCover.file, focusY);
-    setBusy(null);
-    if (!res.ok) return setImgError(res.error || 'No se pudo subir la portada.');
-    setPendingCover(null);
-  };
 
   const addInterest = () => {
     const parts = interestDraft.split(',');
@@ -161,48 +122,13 @@ export const EditProfileModal: React.FC = () => {
         </div>
 
         <div className="overflow-y-auto">
-          {/* Portada + foto */}
-          <div className="relative">
-            <ProfileCover user={previewUser} preview={pendingCover?.url} focusY={pendingCover ? focusY : 0.5} className="h-36 sm:h-44" />
-            <div className="absolute right-3 top-3 flex gap-2">
-              <button type="button" onClick={() => coverInput.current?.click()} disabled={busy !== null} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/55 hover:bg-black/70 text-white text-xs font-semibold backdrop-blur">
-                <ImagePlus className="w-4 h-4" /> {currentUser.cover ? 'Cambiar portada' : 'Subir portada'}
-              </button>
-              {currentUser.cover && !pendingCover && (
-                <button type="button" onClick={() => removeProfileImage('cover')} className="p-1.5 rounded-full bg-black/55 hover:bg-black/70 text-white backdrop-blur" aria-label="Quitar portada" title="Quitar portada">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-            <input ref={coverInput} type="file" accept={IMAGE_TYPES.join(',')} className="hidden" onChange={(e) => { pickCover(e.target.files?.[0]); e.target.value = ''; }} />
-          </div>
+          {/* Portada + foto: se toca, se elige la imagen y se guarda sola */}
+          <CoverPicker user={previewUser} onError={setImgError} className="h-48 sm:h-60" />
 
-          {pendingCover && (
-            <div className="mx-5 sm:mx-6 mt-3 p-3 rounded-2xl bg-slate-50 border border-slate-200 flex flex-wrap items-center gap-3">
-              <label className="flex-1 min-w-[180px] text-xs font-semibold text-slate-700">
-                Encuadre de la portada
-                <input type="range" min={0} max={1} step={0.01} value={focusY} onChange={(e) => setFocusY(+e.target.value)} className="w-full mt-1 accent-red-600" aria-label="Mover la portada arriba o abajo" />
-              </label>
-              <button type="button" onClick={() => setPendingCover(null)} className="px-3 py-1.5 rounded-full text-xs font-semibold bg-white border border-slate-200 text-slate-700">Cancelar</button>
-              <button type="button" onClick={saveCover} disabled={busy !== null} className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-slate-900 text-white">
-                {busy === 'cover' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Usar portada
-              </button>
-            </div>
-          )}
-
-          <div className="px-5 sm:px-6 -mt-10 flex items-end gap-4">
-            <div className="relative">
-              <Avatar name={name || currentUser.name} src={currentUser.avatar} size="xl" className="ring-4 ring-white shadow-lg" />
-              {busy === 'avatar' && (
-                <span className="absolute inset-0 rounded-full bg-black/45 flex items-center justify-center"><Loader2 className="w-6 h-6 text-white animate-spin" /></span>
-              )}
-              <button type="button" onClick={() => avatarInput.current?.click()} disabled={busy !== null} className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-slate-900 hover:bg-slate-700 text-white flex items-center justify-center shadow ring-2 ring-white" aria-label="Cambiar foto de perfil" title="Cambiar foto">
-                <Camera className="w-4 h-4" />
-              </button>
-              <input ref={avatarInput} type="file" accept={IMAGE_TYPES.join(',')} className="hidden" onChange={(e) => { pickAvatar(e.target.files?.[0]); e.target.value = ''; }} />
-            </div>
-            <div className="pb-1 text-xs text-slate-500 space-y-1">
-              <p>JPG, PNG, WebP o GIF · hasta 8 MB. Se recorta y se comprime solo.</p>
+          <div className="relative z-10 px-5 sm:px-6 -mt-12 flex items-start gap-4">
+            <AvatarPicker user={{ name: name || currentUser.name, avatar: currentUser.avatar }} onError={setImgError} />
+            <div className="pt-14 text-xs text-slate-500 space-y-1">
+              <p>Toca la portada o tu foto para cambiarlas. Se guardan solas.</p>
               {currentUser.avatar && (
                 <button type="button" onClick={() => removeProfileImage('avatar')} className="font-semibold text-slate-600 hover:text-red-700 underline underline-offset-2">Quitar foto</button>
               )}
@@ -355,7 +281,7 @@ export const EditProfileModal: React.FC = () => {
 
         <div className="px-5 sm:px-6 py-4 border-t border-slate-100 flex justify-end gap-2 bg-white">
           <button type="button" onClick={close} className="px-5 py-2.5 rounded-full text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700">Cancelar</button>
-          <button type="submit" disabled={busy !== null} className="px-5 py-2.5 rounded-full text-sm font-bold bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/25">Guardar cambios</button>
+          <button type="submit" className="px-5 py-2.5 rounded-full text-sm font-bold bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/25">Guardar cambios</button>
         </div>
       </form>
     </div>

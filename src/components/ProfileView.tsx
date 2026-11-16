@@ -36,6 +36,7 @@ import { safeImageSrc } from '../utils/imageTools';
 import { PERIODS, parseWhen, Period } from '../utils/levels';
 import { StarDisplay } from './StarRating';
 import { UserLink } from './UserLink';
+import { CoverPicker, AvatarPicker } from './ImagePickers';
 import { goTo, goBack, profileUrl, setProfileTab, ProfileTab } from '../utils/router';
 import type { CategoryType, StudentUser } from '../types/exchange';
 
@@ -57,7 +58,7 @@ export const ProfileCover: React.FC<{ user: Pick<StudentUser, 'cover' | 'accent'
   const src = preview || safeImageSrc(user.cover);
   const c = profileColors(user);
   return (
-    <div className={`relative overflow-hidden ${className}`} style={{ background: `linear-gradient(135deg, ${c.from}, ${c.to})` }}>
+    <div className={`${/\babsolute\b/.test(className) ? '' : 'relative '}overflow-hidden ${className}`} style={{ background: `linear-gradient(135deg, ${c.from}, ${c.to})` }}>
       {src ? (
         <img src={src} alt={`Portada de ${user.name}`} className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: `50% ${focusY * 100}%` }} />
       ) : (
@@ -142,6 +143,7 @@ export const ProfilePage: React.FC<{ userId: string; tab?: ProfileTab }> = ({ us
   const [copied, setCopied] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<'avatar' | 'cover' | null>(null);
   const [compact, setCompact] = useState(false);
+  const [imgError, setImgError] = useState<string | null>(null);
   const heroRef = useRef<HTMLDivElement>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
 
@@ -274,13 +276,26 @@ export const ProfilePage: React.FC<{ userId: string; tab?: ProfileTab }> = ({ us
 
       {/* Portada a todo lo ancho */}
       <div className="relative">
-        <ProfileCover user={user} className="h-44 sm:h-64 lg:h-72" />
+        {isMe ? (
+          <CoverPicker user={user} onError={setImgError} className="h-60 sm:h-80 lg:h-[26rem]" />
+        ) : (
+          <ProfileCover user={user} className="h-60 sm:h-80 lg:h-[26rem]" />
+        )}
         <div aria-hidden className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/25 to-transparent pointer-events-none" />
       </div>
+      {imgError && (
+        <div role="alert" className="max-w-5xl w-full mx-auto px-4 sm:px-6 mt-3">
+          <p className="p-2.5 rounded-xl text-xs bg-red-50 border border-red-200 text-red-800">{imgError}</p>
+        </div>
+      )}
 
       <div ref={heroRef} className="relative z-10 max-w-5xl w-full mx-auto px-4 sm:px-6">
         <div className="flex flex-col sm:flex-row sm:items-start gap-4 -mt-16 sm:-mt-20">
-          <Avatar name={user.name} src={user.avatar} size="2xl" className="relative ring-4 ring-white shadow-xl bg-white" />
+          {isMe ? (
+            <AvatarPicker user={user} size="2xl" onError={setImgError} />
+          ) : (
+            <Avatar name={user.name} src={user.avatar} size="2xl" className="relative ring-4 ring-white shadow-xl bg-white" />
+          )}
           <div className="flex-1 min-w-0 sm:pt-[5.75rem]">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-display text-3xl sm:text-4xl font-bold text-slate-900 break-words">{user.name}</h1>

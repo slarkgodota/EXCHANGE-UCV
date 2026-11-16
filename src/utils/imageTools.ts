@@ -11,7 +11,7 @@ export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 export const IMAGE_SPECS = {
   avatar: { w: 320, h: 320, quality: 0.86 },
-  cover: { w: 1500, h: 500, quality: 0.82 },
+  cover: { w: 1920, h: 800, quality: 0.84 },
 } as const;
 export type ImageKind = keyof typeof IMAGE_SPECS;
 
