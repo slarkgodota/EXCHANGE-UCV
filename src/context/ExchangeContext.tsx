@@ -1182,14 +1182,57 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     openAuth('login');
   };
 
+  // ───────────── Datos del autor siempre al día ─────────────
+  // Cada publicación, comentario, respuesta y solicitud guarda una copia del nombre y la foto de quien
+  // la hizo. Aquí se reemplaza esa copia por los datos actuales del perfil, así cualquier cambio del
+  // perfil (foto, nombre, carrera, bio…) se ve al instante en el catálogo, el detalle, el ranking, etc.
+  const usersById = useMemo(() => new Map(users.map((u) => [u.id, u] as [string, StudentUser])), [users]);
+  const livePublications = useMemo(
+    () =>
+      publications.map((p) => {
+        const u = usersById.get(p.author.id);
+        const reviews = (p.reviews || []).some((r) => usersById.has(r.authorId))
+          ? p.reviews.map((r) => {
+              const ru = usersById.get(r.authorId);
+              return ru ? { ...r, authorName: ru.name, authorAvatar: ru.avatar, authorCareer: ru.career } : r;
+            })
+          : p.reviews;
+        if (!u && reviews === p.reviews) return p;
+        return { ...p, author: u ? { ...p.author, ...toPublicAuthor(u), email: p.author.email } : p.author, reviews };
+      }),
+    [publications, usersById]
+  );
+  const liveReplies = useMemo(
+    () =>
+      replies.map((r) => {
+        const u = usersById.get(r.authorId);
+        return u ? { ...r, authorName: u.name, authorAvatar: u.avatar } : r;
+      }),
+    [replies, usersById]
+  );
+  const liveRequests = useMemo(
+    () =>
+      requests.map((q) => {
+        const s = usersById.get(q.senderId);
+        const r = usersById.get(q.receiverId);
+        if (!s && !r) return q;
+        return { ...q, senderName: s?.name ?? q.senderName, senderCareer: s?.career ?? q.senderCareer, senderCampus: s?.campus ?? q.senderCampus, receiverName: r?.name ?? q.receiverName };
+      }),
+    [requests, usersById]
+  );
+  const liveSelected = useMemo(
+    () => (selectedPublication ? livePublications.find((p) => p.id === selectedPublication.id) || selectedPublication : null),
+    [selectedPublication, livePublications]
+  );
+
   return (
     <ExchangeContext.Provider
       value={{
-        publications,
+        publications: livePublications,
         users,
         currentUser,
         isLoggedIn,
-        requests,
+        requests: liveRequests,
         reports,
         roles,
         createRole,
@@ -1200,7 +1243,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         filter,
         setFilter,
         resetFilter,
-        selectedPublication,
+        selectedPublication: liveSelected,
         setSelectedPublication,
         isCreateModalOpen,
         setIsCreateModalOpen,
@@ -1231,7 +1274,7 @@ export const ExchangeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         deletePublication,
         recordResourceOpen,
         addReview,
-        replies,
+        replies: liveReplies,
         addReply,
         deleteReply,
         userLevels,

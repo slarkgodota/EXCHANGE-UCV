@@ -15,6 +15,7 @@ import {
 import { useExchange } from '../context/ExchangeContext';
 import { getCampusLabel } from '../data/ucv';
 import { OrcidFor } from './Orcid';
+import { UserLink } from './UserLink';
 
 export const RequestsDrawer: React.FC = () => {
   const {
@@ -162,7 +163,7 @@ export const RequestsDrawer: React.FC = () => {
                 <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/70 text-xs space-y-1">
                   <div className="flex items-center justify-between text-slate-700">
                     <span className="font-semibold">
-                      {activeTab === 'recibidas' ? req.senderName : req.receiverName}{' '}
+                      <UserLink userId={activeTab === 'recibidas' ? req.senderId : req.receiverId}>{activeTab === 'recibidas' ? req.senderName : req.receiverName}</UserLink>{' '}
                       <OrcidFor userId={activeTab === 'recibidas' ? req.senderId : req.receiverId} />
                     </span>
                     <span className="text-[10px] text-slate-500">

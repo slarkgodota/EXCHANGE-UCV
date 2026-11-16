@@ -13,6 +13,7 @@ import {
   Video,
   FileCode,
   ExternalLink,
+  ArrowRight,
   MessageSquare,
   Sparkles,
   CheckCircle2,
@@ -362,7 +363,9 @@ export const PublicationDetailModal: React.FC = () => {
 
             <div className="bg-gradient-to-br from-slate-50 to-slate-100/60 p-5 rounded-2xl border border-slate-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <Avatar name={pub.author.name} src={pub.author.avatar} size="lg" />
+                <UserLink userId={pub.author.id} className="shrink-0 rounded-full hover:no-underline" title={`Ver perfil de ${pub.author.name}`}>
+                  <Avatar name={pub.author.name} src={pub.author.avatar} size="lg" />
+                </UserLink>
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <h4 className="font-bold text-slate-900 text-base"><UserLink userId={pub.author.id}>{pub.author.name}</UserLink></h4>
@@ -384,18 +387,13 @@ export const PublicationDetailModal: React.FC = () => {
                 </div>
               </div>
 
-              {false && pub.author.orcid && (
-                <a
-                  href={`https://orcid.org/${pub.author.orcid}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-semibold shrink-0 transition-colors"
-                >
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  ORCID: {pub.author.orcid}
-                  <ExternalLink className="w-3 h-3 text-emerald-600" />
-                </a>
-              )}
+              <UserLink
+                userId={pub.author.id}
+                className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold hover:no-underline"
+                title={`Ver perfil de ${pub.author.name}`}
+              >
+                Ver perfil <ArrowRight className="w-3.5 h-3.5" />
+              </UserLink>
             </div>
           </div>
 

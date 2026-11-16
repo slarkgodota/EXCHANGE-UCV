@@ -56,7 +56,9 @@ export const PublicationCard: React.FC<{ publication: Publication; index?: numbe
 
       <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <Avatar name={p.author.name} src={p.author.avatar} size="sm" />
+          <UserLink userId={p.author.id} className="shrink-0 rounded-full hover:no-underline" title={`Ver perfil de ${p.author.name}`}>
+            <Avatar name={p.author.name} src={p.author.avatar} size="sm" />
+          </UserLink>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-slate-800 truncate flex items-center gap-1">
               <UserLink userId={p.author.id} className="truncate">{p.author.name}</UserLink>

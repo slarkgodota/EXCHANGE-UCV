@@ -9,12 +9,14 @@ export const UserLink: React.FC<{ userId?: string; className?: string; children:
   children,
   title,
 }) => {
-  const { users, setSelectedPublication, setIsAuthModalOpen } = useExchange();
+  const { users, setSelectedPublication, setIsAuthModalOpen, setIsRequestsDrawerOpen, setIsAdminModalOpen } = useExchange();
   if (!userId || !users.some((u) => u.id === userId)) return <span className={className}>{children}</span>;
   const open = (e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedPublication(null);
     setIsAuthModalOpen(false);
+    setIsRequestsDrawerOpen(false);
+    setIsAdminModalOpen(false);
     goToProfile(userId);
   };
   return (
